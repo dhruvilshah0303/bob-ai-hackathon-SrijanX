@@ -1,1 +1,2 @@
-Vercel frontend deployment pending. Backend: https://ai-ambulance-coordinator-api.onrender.com
+Frontend: https://frontend-ruby-iota-56.vercel.app
+Backend: https://ai-ambulance-coordinator-api.onrender.com
