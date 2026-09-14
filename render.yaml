@@ -19,6 +19,6 @@ services:
       - key: DEMO_TIME_SCALE
         value: "10"
       - key: APP_ACCESS_TOKEN
-        generateValue: true
+        value: ""
       - key: DATABASE_URL
         value: ""
