@@ -2,9 +2,15 @@ team:
   name: "SrijanX"
   track: "AI"
   lead:
-    name: "Dhruvil Shah"
-    email: "25dcs118@charusat.edu.in"
-  members: []
+    name: "Shaunak Patel"                           # REQUIRED — e.g., "Alice Chen"
+    email: "25dcs098@charusat.edu.in"                          # REQUIRED — e.g., "alice.chen@ibm.com"
+  members:
+    - name: "Abhi Patel"                         # REQUIRED — Team member 1
+      email: "d26dcs160@charusat.edu.in"
+    - name: "Moon Shah"                         # Add more members by copying the two lines above
+      email: "25dcs121@charusat.edu.in"
+    - name: "Dhruvil Shah"
+      email: "25dcs118@charusat.edu.in"
 
 submission:
   title: "AI Ambulance-to-Hospital Coordinator"
