@@ -2,48 +2,46 @@
 
 ## System Architecture
 
-[Describe the overall architecture of your system. Replace the Mermaid diagram below with your actual architecture.]
-
 ```mermaid
 graph TD
-    A[User / Browser] -->|HTTP| B[Frontend - React]
-    B -->|REST API| C[Backend - FastAPI]
-    C -->|SDK| D[watsonx.ai]
-    C -->|Query| E[PostgreSQL]
-    C -->|Publish| F[Slack Webhook]
-    D -->|Inference Result| C
+    A[Dispatcher Browser] -->|HTTPS and WebSocket| B[FastAPI Application]
+    B --> C[Recommendation Engine]
+    B --> D[ETA Service]
+    B --> E[In-memory Trip and Hospital State]
+    B --> F[(SQLite or PostgreSQL Audit Store)]
+    D --> G[Google Maps or Mapbox]
+    D --> H[Deterministic Simulated ETA]
 ```
 
 ## Components
 
 | Component | Technology | Responsibility |
 |---|---|---|
-| Frontend | [e.g., React 18] | [e.g., Dashboard UI, user interaction] |
-| Backend API | [e.g., FastAPI] | [e.g., Business logic, orchestration] |
-| AI / ML | [e.g., watsonx.ai] | [e.g., Anomaly scoring, classification] |
-| Database | [e.g., PostgreSQL] | [e.g., Storing pipeline events and scores] |
-| Notifications | [e.g., Slack API] | [e.g., Alerting on threshold breaches] |
+| Frontend | Static HTML, CSS, JavaScript, Leaflet | Map, dispatch controls, hospital view, analytics |
+| Backend API | FastAPI and Uvicorn | REST endpoints, WebSocket events, lifecycle orchestration |
+| Recommendation engine | Python | Clinical constraint filtering, weighted scoring, explanations |
+| ETA service | Python, Google Maps or Mapbox, fallback simulator | Travel-time estimates with stable demo fallback |
+| Live state | Python process memory | Active trips, reservations, hospital capacity, WebSocket broadcasts |
+| Audit database | SQLAlchemy with SQLite or PostgreSQL | Trip history, events, and analytics persistence |
 
 ## Data Flow
 
-[Describe how data moves through your system from input to output.]
-
-1. [e.g., Pipeline logs are ingested via a webhook from GitHub Actions]
-2. [e.g., Logs are preprocessed and chunked into 512-token segments]
-3. [e.g., Each chunk is sent to the watsonx.ai inference endpoint]
-4. [e.g., Anomaly scores are stored in PostgreSQL]
-5. [e.g., The React dashboard polls the API every 30 seconds to refresh]
+1. The browser creates a trip through the REST API.
+2. The API loads scenario, hospital, and severity-rule data.
+3. The recommendation engine filters and scores hospitals.
+4. The browser renders the recommendation and comparison table.
+5. Accepting a destination mutates the locked shared state and writes an audit event.
+6. The trip loop broadcasts position, trip, and reroute updates over WebSocket.
+7. Analytics queries read persisted audit data.
 
 ## Security Considerations
 
-[Note any security decisions relevant to the architecture — even if basic.]
-
-- [e.g., API keys stored in environment variables, never committed to git]
-- [e.g., All API routes require a Bearer token]
-- [e.g., Database credentials rotated via IBM Secrets Manager]
+- Secrets are read from environment variables and excluded from git.
+- `APP_ACCESS_TOKEN` can protect API and WebSocket access.
+- `ALLOWED_ORIGINS` should be restricted to the Vercel origin in production.
+- Rate limiting and structured logging are configurable.
+- The prototype uses fictional hospital data and must not be connected to real patient data without a full security and privacy review.
 
 ## Scalability Notes
 
-[Optional: how would this scale beyond the hackathon prototype?]
-
-[e.g., "The FastAPI backend is stateless and could be horizontally scaled behind a load balancer. The watsonx.ai calls are the bottleneck and would benefit from request batching."]
+The current process lock makes demo state updates consistent within one instance. A production deployment should move live trip state and broadcasts to shared infrastructure, use a managed PostgreSQL database, and integrate with hospital information systems before horizontal scaling.

@@ -1,0 +1,4 @@
+{
+  "incident_location": {"lat": 23.0300, "lng": 72.5600, "label": "Incident Scene (Demo)"},
+  "default_condition": "cardiac"
+}

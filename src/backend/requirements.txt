@@ -1,0 +1,15 @@
+fastapi>=0.110
+uvicorn[standard]>=0.29
+websockets>=12.0
+requests>=2.31
+python-dotenv>=1.0
+sqlalchemy>=2.0
+
+# Needed only when DATABASE_URL points at Postgres (e.g. in production on
+# Render/Heroku/Railway/etc). SQLite (the local-dev default) needs nothing
+# extra - sqlite3 ships with Python. Safe to always install.
+psycopg2-binary>=2.9
+
+# Optional - only used if SENTRY_DSN is set (see sentry_init.py). The app
+# runs fine without this installed; it's a no-op until you opt in.
+sentry-sdk>=1.40

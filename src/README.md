@@ -1,47 +1,10 @@
 # Source Code
 
-Place all your project's source code in this folder.
+The application is organized as a small web system:
 
-## Structure Guidelines
+- `backend/` contains the FastAPI application, recommendation engine, ETA service, persistence layer, JSON demo data, and pytest tests.
+- `frontend/` contains the static browser dashboard, Leaflet map, and WebSocket client.
+- `Dockerfile` builds the backend and frontend into one Railway-compatible container.
+- `Procfile` provides a platform-style Uvicorn start command.
 
-Organize your code logically. Here are common patterns — use whatever fits
-your project:
-
-### Web Application
-```
-src/
-  backend/        ← API server code
-  frontend/       ← UI code
-  shared/         ← Shared utilities/types
-```
-
-### Data / AI Project
-```
-src/
-  data/           ← Data ingestion / preprocessing
-  models/         ← ML model code
-  api/            ← Serving layer
-  notebooks/      ← Jupyter notebooks (exploration)
-```
-
-### CLI / Script-based Tool
-```
-src/
-  cli/            ← CLI entry points
-  lib/            ← Core logic
-  utils/          ← Helpers
-```
-
-## Important Files to Include
-
-- `requirements.txt` or `package.json` — dependency manifest
-- `.env.example` — template for environment variables (NEVER commit `.env`)
-- Any database migration files
-- Configuration files
-
-## What NOT to Include in src/
-
-- `.env` files with real secrets
-- Large binary files (use Git LFS or link externally)
-- `node_modules/` or `venv/` (these are in `.gitignore`)
-- Build artifacts (`dist/`, `build/`, `__pycache__/`)
+The frontend uses same-origin requests by default. For a separate Vercel frontend, set `window.COORDINATOR_BACKEND_URL` in `frontend/config.js` to the public Railway URL.

@@ -1,79 +1,83 @@
 # Setup Guide
 
-> **This file is read by the automated evaluation pipeline. Be precise and complete.**
-
 ## Prerequisites
 
-Before you begin, ensure you have the following installed:
-
-- [ ] [e.g., Python 3.11+]
-- [ ] [e.g., Node.js 18+]
-- [ ] [e.g., Docker Desktop]
-- [ ] [e.g., An IBM Cloud account with watsonx.ai access]
+- Python 3.11 or newer
+- Git
+- A modern browser
+- Docker Desktop (optional, for the single-container run)
 
 ## Environment Variables
 
-Copy `.env.example` to `.env` and fill in the values:
-
-```bash
-cp .env.example .env
-```
+The backend reads `src/backend/.env` or `src/backend/local.env`. Start from `src/backend/.env.example`.
 
 | Variable | Description | Required |
 |---|---|---|
-| `WATSONX_API_KEY` | Your IBM watsonx.ai API key | Yes |
-| `WATSONX_PROJECT_ID` | Your watsonx.ai project ID | Yes |
-| `DATABASE_URL` | PostgreSQL connection string | Yes |
-| `SLACK_WEBHOOK_URL` | Slack webhook for alerts | No |
+| `GOOGLE_MAPS_API_KEY` | Optional Google traffic ETA provider | No |
+| `MAPBOX_API_KEY` | Optional Mapbox traffic ETA provider | No |
+| `DEMO_TIME_SCALE` | Speed multiplier for simulated ambulance movement | No |
+| `APP_ACCESS_TOKEN` | Shared API and WebSocket access token | Recommended in production |
+| `ALLOWED_ORIGINS` | Comma-separated browser origins | Recommended in production |
+| `DATABASE_URL` | SQLite default or PostgreSQL connection URL | No |
+| `RATE_LIMIT_ENABLED` | Enable API rate limiting | No |
+| `RATE_LIMIT_PER_MINUTE` | Per-IP API request limit | No |
+| `SENTRY_DSN` | Optional Sentry error tracking DSN | No |
+| `LOG_LEVEL` | Application log level | No |
 
 ## Installation
 
 ```bash
-# 1. Clone the repository
-git clone https://github.com/[your-org]/[your-repo].git
-cd [your-repo]
-
-# 2. Install backend dependencies
-[your command — e.g.: pip install -r requirements.txt]
-
-# 3. Install frontend dependencies (if applicable)
-[your command — e.g.: cd frontend && npm install]
-
-# 4. Set up the database (if applicable)
-[your command — e.g.: python manage.py migrate]
+git clone https://github.com/dhruvilshah0303/bob-ai-hackathon-SrijanX.git
+cd bob-ai-hackathon-SrijanX
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r src/backend/requirements-dev.txt
 ```
+
+On macOS or Linux, activate with `source .venv/bin/activate`.
 
 ## Running the Application
 
 ```bash
-# Start the backend
-[your command — e.g.: uvicorn app.main:app --reload]
-
-# Start the frontend (in a separate terminal, if applicable)
-[your command — e.g.: cd frontend && npm run dev]
+cd src/backend
+uvicorn app:app --reload --port 8000
 ```
 
-The application will be available at: `http://localhost:[PORT]`
+Open `http://localhost:8000`. The API serves the static frontend and WebSocket from the same origin.
+
+For a separate frontend deployment, set `window.COORDINATOR_BACKEND_URL` in `src/frontend/config.js` to the Railway backend URL and deploy `src/frontend` as a static Vercel project.
 
 ## Running Tests
 
-```bash
-[your test command — e.g.: pytest tests/ -v]
-```
-
-## Quick Demo (Optional)
-
-If you have a demo script or sample data to showcase the project quickly:
+From the repository root:
 
 ```bash
-[e.g.: python demo/seed_demo_data.py]
-[e.g.: open http://localhost:8000/demo]
+python -m pytest src/backend/tests -v
 ```
+
+## Docker
+
+```bash
+cd src
+docker build -t ambulance-coordinator .
+docker run --rm -p 8000:8000 ambulance-coordinator
+```
+
+## Quick Demo
+
+1. Open the dashboard and choose a condition.
+2. Select **Assess & Get AI Recommendation**.
+3. Inspect the rejected hospitals and recommendation explanation.
+4. Accept the destination and watch capacity and the ambulance marker update.
+5. Launch a second ambulance to demonstrate shared capacity.
+6. Open Hospital View and Analytics to inspect pre-alerts and audit events.
 
 ## Troubleshooting
 
 | Issue | Solution |
 |---|---|
-| [e.g., `ModuleNotFoundError`] | [e.g., Run `pip install -r requirements.txt` again] |
-| [e.g., Database connection refused] | [e.g., Ensure PostgreSQL is running: `docker compose up db`] |
-| [e.g., watsonx.ai 401 error] | [e.g., Check `WATSONX_API_KEY` in your `.env` file] |
+| `ModuleNotFoundError` | Activate the virtual environment and rerun `python -m pip install -r src/backend/requirements-dev.txt`. |
+| Browser cannot connect | Confirm Uvicorn is running from `src/backend` on port 8000. |
+| Live ETA is simulated | Set `GOOGLE_MAPS_API_KEY` or `MAPBOX_API_KEY`; simulation is the expected no-key fallback. |
+| Cross-origin browser errors | Set backend `ALLOWED_ORIGINS` to the exact Vercel origin and set `frontend/config.js` to the Railway origin. |
+| PostgreSQL connection error | Leave `DATABASE_URL` empty for local SQLite, or verify the managed database URL and driver. |

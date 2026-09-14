@@ -1,121 +1,71 @@
-# 🚀 [Your Project Title Here]
+# AI Ambulance-to-Hospital Coordinator
 
-> ⚠️ **Replace everything in `[ ]` brackets with your actual content before submission.**
+An explainable emergency-dispatch dashboard that recommends the hospital where a patient can reach appropriate treatment fastest, not simply the nearest hospital.
 
----
-
-## 👥 Team
+## Team
 
 | Field | Value |
 |---|---|
-| **Team Name** | [Your Team Name] |
-| **Track** | [AI / DevOps / Sustainability / Open] |
-| **Team Lead** | [Name] — [email@ibm.com] |
-| **Members** | [Name 1], [Name 2], [Name 3] |
+| Team name | SrijanX |
+| Track | AI |
+| Team lead | Dhruvil Shah - 25dcs118@charusat.edu.in |
 
----
+## Problem
 
-## 🎯 Problem Statement
+Dispatchers must balance clinical capability, available ICU or ED capacity, specialist coverage, and traffic under time pressure. A nearest-hospital decision can send a patient to a facility that cannot provide the required treatment or has no usable capacity.
 
-> In 2–3 sentences: What problem does your project solve? Who experiences this problem?
+## Solution
 
-[Describe the real-world problem your project addresses. Be specific about who the user is and what pain point they face.]
+The coordinator filters hospitals against the incident severity and current capacity, calculates traffic-aware arrival and treatment times, and ranks the viable options with a human-readable explanation. The dashboard lets a dispatcher assess, accept, reroute, and monitor multiple ambulances while hospital capacity remains a shared resource.
 
----
+## Key Features
 
-## 💡 Solution
+- Explainable constraint filtering and weighted hospital ranking
+- Live Leaflet map with concurrent ambulance trips
+- ICU and ED reservation with release on reroute or cancellation
+- Hospital pre-alerts and persistent audit analytics
+- Live ETA integration with deterministic simulated fallback
+- Optional production access token, CORS, rate limiting, logging, and Sentry settings
 
-> In 2–3 sentences: What did you build? How does it solve the problem above?
+## Tech Stack
 
-[Describe your solution clearly. Explain the core mechanism — what makes it work.]
+Python, FastAPI, Uvicorn, SQLAlchemy, JavaScript, Leaflet, WebSockets, SQLite/PostgreSQL, Docker, GitHub Actions, and OpenStreetMap.
 
----
+## Repository Structure
 
-## ✨ Key Features
-
-- **Feature 1:** [Brief description — e.g., "Real-time anomaly detection using watsonx.ai"]
-- **Feature 2:** [Brief description]
-- **Feature 3:** [Brief description]
-- **Feature 4:** [Optional]
-- **Feature 5:** [Optional]
-
----
-
-## 🛠️ Tech Stack
-
-| Category | Technologies |
-|---|---|
-| **Languages** | [e.g., Python, TypeScript] |
-| **Frameworks** | [e.g., FastAPI, React] |
-| **IBM Technologies** | [e.g., watsonx.ai, IBM Bob, IBM Cloud] |
-| **Databases** | [e.g., PostgreSQL, Redis] |
-| **Other** | [e.g., Docker, GitHub Actions] |
-
----
-
-## 📁 Repository Structure
-
-```
-├── src/                  # All source code
-├── docs/                 # Written documentation
-│   ├── problem-statement.md
-│   ├── solution-overview.md
-│   ├── architecture.md
-│   └── setup-guide.md
-├── demo/                 # Demo artifacts
-│   ├── screenshots/      # App screenshots
-│   └── demo-video-link.txt  # Link to demo video
-├── presentation/         # Slide deck
-└── submission.yaml       # Structured submission metadata
+```text
+src/
+  backend/       FastAPI API, recommendation engine, data, and tests
+  frontend/      Static dashboard and browser client
+  Dockerfile     Single-container deployment for Railway or similar hosts
+docs/             Problem, solution, architecture, and setup documentation
+demo/             Demo links and screenshots
+presentation/     Hackathon presentation assets
+submission.yaml   Structured submission metadata
 ```
 
----
+## Run Locally
 
-## ⚡ How to Run
-
-> **Copy these exact steps from your [`docs/setup-guide.md`](docs/setup-guide.md)**
+See [docs/setup-guide.md](docs/setup-guide.md) for tested commands. The shortest path is:
 
 ```bash
-# 1. Clone the repo
-git clone https://github.com/[your-repo].git
-cd [your-repo]
-
-# 2. Install dependencies
-[your install command here]
-
-# 3. Configure environment
-cp .env.example .env
-# Edit .env with your values
-
-# 4. Run the project
-[your run command here]
+cd src/backend
+python -m pip install -r requirements.txt
+uvicorn app:app --reload --port 8000
 ```
 
----
+Open `http://localhost:8000`. The backend serves the frontend in the bundled local configuration.
 
-## 🖥️ Demo
+## Demo
 
-| Artifact | Link |
-|---|---|
-| 📹 Demo Video | [See demo/demo-video-link.txt](demo/demo-video-link.txt) |
-| 🌐 Live Demo | [See demo/live-demo-url.txt](demo/live-demo-url.txt) |
-| 🖼️ Screenshots | [See demo/screenshots/](demo/screenshots/) |
-| 📊 Presentation | [See presentation/slides.pdf](presentation/) |
+- Live demo: [demo/live-demo-url.txt](demo/live-demo-url.txt)
+- Video: [demo/demo-video-link.txt](demo/demo-video-link.txt)
+- Screenshots: [demo/screenshots/](demo/screenshots/)
 
----
+## Known Limitations
 
-## ⚠️ Known Limitations
+The hospital records, ambulance locations, and capacity changes are simulated. Authentication is a shared token rather than role-based access control. A production deployment should connect to hospital information systems and use a shared durable store for live trip state.
 
-> Be honest — judges appreciate transparency over overclaiming.
+## What We Are Most Proud Of
 
-- [Limitation 1: e.g., "Authentication is mocked — not production-ready"]
-- [Limitation 2: e.g., "Only tested on Chrome"]
-- [Limitation 3: e.g., "Feature X is scaffolded but not fully implemented"]
-
----
-
-## 🏅 What We're Most Proud Of
-
-[Tell the judges what part of your submission is strongest and worth paying close attention to.]
-
----
+The project makes the recommendation reasoning inspectable: dispatchers can see why a hospital was disqualified, how capacity reservations affect other ambulances, and why a reroute is suggested.

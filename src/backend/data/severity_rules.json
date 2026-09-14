@@ -1,0 +1,46 @@
+{
+  "conditions": [
+    {
+      "code": "cardiac",
+      "label": "Suspected Heart Attack / Cardiac Event",
+      "severity": "Red",
+      "required": ["icu", "ed_accepting"],
+      "preferred_specialist": "cardiologist"
+    },
+    {
+      "code": "stroke",
+      "label": "Suspected Stroke",
+      "severity": "Red",
+      "required": ["icu", "ed_accepting"],
+      "preferred_specialist": "neurologist"
+    },
+    {
+      "code": "trauma",
+      "label": "Major Trauma / Accident",
+      "severity": "Red",
+      "required": ["icu", "ed_accepting"],
+      "preferred_specialist": "trauma_surgeon"
+    },
+    {
+      "code": "urgent_stable",
+      "label": "Urgent but Stable",
+      "severity": "Yellow",
+      "required": ["ed_accepting"],
+      "preferred_specialist": null
+    },
+    {
+      "code": "non_critical",
+      "label": "Non-Critical",
+      "severity": "Green",
+      "required": ["ed_accepting"],
+      "preferred_specialist": null
+    }
+  ],
+  "scoring_weights": {
+    "w1_delay": 0.5,
+    "w2_specialist": 0.25,
+    "w3_capacity_headroom": 0.1,
+    "w4_ed_overload_penalty": 0.15
+  },
+  "stale_data_threshold_minutes": 10
+}

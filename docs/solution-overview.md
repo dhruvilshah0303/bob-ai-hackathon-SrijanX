@@ -2,40 +2,23 @@
 
 ## What We Built
 
-[Describe your solution in plain language. Avoid jargon — write as if explaining to a smart colleague unfamiliar with your tech stack.]
+AI Ambulance-to-Hospital Coordinator is a browser dashboard backed by a FastAPI service. It turns an incident condition and current hospital data into an explainable destination recommendation based on fastest expected treatment.
 
 ## How It Works
 
-[Explain the core mechanism step by step. A numbered list or simple flow works well here.]
+1. The dispatcher starts a trip and selects the suspected patient condition.
+2. The service maps that condition to required capabilities such as ICU capacity or a specialist.
+3. Hospitals that fail hard clinical or capacity constraints are removed.
+4. The remaining hospitals receive ETA, capacity, specialist, and treatment-time scores.
+5. The ranked recommendation and reasons are returned to the dashboard.
+6. Accepting a recommendation reserves capacity and sends a hospital pre-alert.
+7. A background trip loop updates position and checks for changed hospital conditions.
+8. If the current destination becomes unsuitable, the service suggests a reroute and releases the old reservation when accepted.
 
-1. [Step 1: e.g., "User connects their GitHub repository via OAuth"]
-2. [Step 2: e.g., "The system ingests pipeline logs and feeds them to watsonx.ai"]
-3. [Step 3: e.g., "An anomaly score is computed and displayed on the dashboard"]
-4. [Step 4: e.g., "Alerts are sent to Slack when the score exceeds a threshold"]
+## What Makes It Different
 
-## Architecture Diagram
-
-> See [`architecture.md`](architecture.md) for the detailed diagram.
-
-[Optionally include a simple ASCII or Mermaid diagram here for quick reference.]
-
-```
-[User] → [Frontend: React] → [API: FastAPI] → [watsonx.ai] → [Dashboard]
-                                    ↓
-                             [PostgreSQL DB]
-```
-
-## Key Design Decisions
-
-| Decision | Rationale |
-|---|---|
-| [e.g., Used watsonx.ai for anomaly detection] | [e.g., Pre-trained models reduced time-to-value vs. building from scratch] |
-| [Decision 2] | [Rationale 2] |
-| [Decision 3] | [Rationale 3] |
+The prototype optimizes time to treatment instead of distance and exposes the comparison behind the decision. It also models capacity as a shared resource, so multiple active ambulances can contend for the same hospital beds in the demo.
 
 ## IBM Technologies Used
 
-[Explain specifically HOW you used each IBM technology — not just that you used it.]
-
-- **[IBM Tech 1, e.g., watsonx.ai]:** [How it was used — e.g., "Used the `ibm/granite-13b-instruct-v2` model via the Python SDK to classify anomaly types from log text."]
-- **[IBM Tech 2]:** [How it was used]
+No IBM service is claimed in this prototype. The implementation is intentionally self-contained so judges can run it without external credentials. The architecture leaves clear integration points for hospital information systems and an enterprise AI service in a future production version.

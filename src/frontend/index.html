@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>AI Ambulance-to-Hospital Coordinator — Demo</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">🚑 AI Ambulance-to-Hospital Coordinator <span class="tag">DEMO PROTOTYPE</span></div>
+  <nav class="tabs">
+    <button class="tab-btn active" data-tab="dispatch">Ambulance / Dispatcher</button>
+    <button class="tab-btn" data-tab="hospital">Hospital View</button>
+    <button class="tab-btn" data-tab="analytics">Analytics</button>
+  </nav>
+  <div class="eta-badge" id="etaProviderBadge">ETA source: —</div>
+</header>
+
+<div id="toastStack" class="toast-stack" aria-live="polite"></div>
+
+<div id="accessGate" class="access-gate hidden">
+  <div class="access-gate-card">
+    <h2>🔒 Access code required</h2>
+    <p class="hint">This deployment requires an access code. Ask whoever shared this link with you.</p>
+    <input type="password" id="accessTokenInput" placeholder="Access code" autocomplete="off" />
+    <button id="accessTokenSubmit" class="btn btn-primary full">Continue</button>
+    <p class="hint" id="accessGateError" style="color:#ff5d5d"></p>
+  </div>
+</div>
+
+<!-- ===================== DISPATCH TAB ===================== -->
+<main id="tab-dispatch" class="tab-panel active">
+  <section class="map-col">
+    <div id="map"></div>
+    <div id="rerouteBanner" class="reroute-banner hidden">
+      <div class="reroute-text"></div>
+      <div class="reroute-actions">
+        <button id="rerouteAccept" class="btn btn-primary">Reroute now</button>
+        <button id="rerouteDecline" class="btn btn-ghost">Keep current destination</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="side-col">
+
+    <div class="card">
+      <h3>My ambulance <span class="muted" id="myAmbulanceLabel"></span></h3>
+      <p class="hint">Every ambulance in this system is an independent trip competing for the same hospital capacity — use the button below to prove it live.</p>
+      <button id="addSecondAmbBtn" class="btn btn-secondary full">🚑 + Launch a second ambulance (autopilot demo)</button>
+      <div id="fleetList" class="fleet-list"></div>
+    </div>
+
+    <div class="card">
+      <h3>1. Patient Severity Assessment</h3>
+      <label for="conditionSelect">Suspected condition</label>
+      <select id="conditionSelect"></select>
+      <button id="assessBtn" class="btn btn-primary full">Assess &amp; Get AI Recommendation</button>
+    </div>
+
+    <div class="card override-card" id="overrideCard" hidden>
+      <h3>Override reason</h3>
+      <p class="hint">You're choosing a hospital other than the AI's top pick. A one-line reason is logged for audit.</p>
+      <input type="text" id="overrideReasonInput" placeholder="e.g. family request, known local issue..." />
+      <div class="sim-row" style="display:flex; gap:8px;">
+        <button id="overrideConfirmBtn" class="btn btn-primary" style="flex:1">Confirm override</button>
+        <button id="overrideCancelBtn" class="btn btn-ghost" style="flex:1">Cancel</button>
+      </div>
+    </div>
+
+    <div class="card" id="recommendationCard" hidden>
+      <h3>2. AI Hospital Recommendation <span class="muted" id="conditionLabel"></span></h3>
+      <table class="rec-table" id="recTable">
+        <thead>
+          <tr>
+            <th>Hospital</th>
+            <th>Dist.</th>
+            <th>ETA</th>
+            <th>ICU</th>
+            <th>Specialist</th>
+            <th>ED Load</th>
+            <th>Est. Treatment Delay</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <p class="hint">Reasoning for each hospital is shown on hover / tap on a row. The AI recommendation optimizes total time-to-treatment, not just distance.</p>
+    </div>
+
+    <div class="card" id="tripCard" hidden>
+      <h3>3. Trip Status</h3>
+      <div id="tripStatus"></div>
+    </div>
+
+    <div class="card">
+      <h3>🧪 Simulate a live change (for demo)</h3>
+      <p class="hint">Change a hospital's capacity mid-transit to trigger dynamic rerouting.</p>
+      <label for="simHospital">Hospital</label>
+      <select id="simHospital"></select>
+      <div class="sim-row">
+        <label><input type="checkbox" id="simIcuTaken" /> Set ICU beds free = 0 (no ICU)</label>
+      </div>
+      <div class="sim-row">
+        <label><input type="checkbox" id="simEdOverload" /> Overload ED (occupied = total)</label>
+      </div>
+      <div class="sim-row">
+        <label><input type="checkbox" id="simCardiologist" /> Cardiologist comes on duty</label>
+      </div>
+      <button id="applySimBtn" class="btn btn-secondary full">Apply change</button>
+    </div>
+
+    <button id="resetBtn" class="btn btn-ghost full">↺ Reset demo</button>
+  </section>
+</main>
+
+<!-- ===================== HOSPITAL TAB ===================== -->
+<main id="tab-hospital" class="tab-panel">
+  <section class="hospital-view">
+    <h2>🏥 Receiving Hospital — Live Pre-Alert Dashboard</h2>
+    <p class="hint">This simulates what a hospital's ED sees when the coordinator pre-alerts them about an inbound patient. A hospital can receive alerts from more than one ambulance at once — that's shown here too.</p>
+    <div id="prealertPanel" class="prealert-list">
+      <p class="muted">No active pre-alerts yet. Select a destination hospital in the Dispatcher tab.</p>
+    </div>
+    <h3>All hospitals — current capacity</h3>
+    <table class="hosp-table" id="hospTable">
+      <thead>
+        <tr><th>Hospital</th><th>ED bays</th><th>ICU free</th><th>Ward free</th><th>Accepting</th><th>Specialists on duty</th><th>Updated</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </section>
+</main>
+
+<!-- ===================== ANALYTICS TAB ===================== -->
+<main id="tab-analytics" class="tab-panel">
+  <section class="analytics-view">
+    <h2>📊 Emergency Response Analytics</h2>
+    <div class="kpi-grid" id="kpiGrid"></div>
+    <h3>Audit log</h3>
+    <table class="audit-table" id="auditTable">
+      <thead><tr><th>Time</th><th>Event</th><th>Details</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </section>
+</main>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
