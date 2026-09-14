@@ -45,7 +45,7 @@ uvicorn app:app --reload --port 8000
 
 Open `http://localhost:8000`. The API serves the static frontend and WebSocket from the same origin.
 
-For a separate frontend deployment, set `window.COORDINATOR_BACKEND_URL` in `src/frontend/config.js` to the Render backend URL and deploy `src/frontend` as a static Vercel project.
+For a separate frontend deployment, set `window.COORDINATOR_BACKEND_URL` in `src/frontend/config.js` to the Render backend URL and deploy `src/frontend` as a static Vercel project. The Render Blueprint already restricts browser CORS to the published Vercel origin.
 
 For the hosted backend, use the included `render.yaml` Blueprint. It installs
 `src/backend/requirements.txt`, starts Uvicorn on Render's `$PORT`, and exposes

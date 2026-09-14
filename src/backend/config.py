@@ -47,6 +47,18 @@ DATABASE_URL = os.environ.get("DATABASE_URL", "").strip() or None
 RATE_LIMIT_PER_MINUTE = int(os.environ.get("RATE_LIMIT_PER_MINUTE", "120"))
 RATE_LIMIT_ENABLED = os.environ.get("RATE_LIMIT_ENABLED", "true").strip().lower() not in ("0", "false", "no")
 
+# SECURITY: the rate limiter identifies a client by IP address so it can cap
+# requests per-IP. By default it uses the direct TCP connection's address
+# ONLY. It will NOT read the "X-Forwarded-For" header unless you explicitly
+# set this to true - that header is client-controllable, so trusting it
+# blindly lets anyone bypass the rate limit by sending a fake header (or
+# spoof another user's IP to get THEM rate-limited). Only enable this if you
+# know your deployment sits behind a reverse proxy/load balancer that you
+# control and that OVERWRITES this header itself (e.g. a platform like
+# Render/Heroku/Railway/nginx configured to strip client-supplied values) -
+# never enable it if the app is reachable directly by untrusted clients.
+TRUST_PROXY_HEADERS = os.environ.get("TRUST_PROXY_HEADERS", "false").strip().lower() in ("1", "true", "yes")
+
 # Optional error tracking - only initializes if a DSN is provided.
 SENTRY_DSN = os.environ.get("SENTRY_DSN", "").strip() or None
 

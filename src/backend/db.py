@@ -42,7 +42,17 @@ def _resolve_database_url() -> str:
 DATABASE_URL = _resolve_database_url()
 IS_SQLITE = DATABASE_URL.startswith("sqlite")
 
-_engine_kwargs = {"connect_args": {"check_same_thread": False}} if IS_SQLITE else {}
+# pool_pre_ping: issue a cheap "SELECT 1" before handing out a pooled
+# connection, so a connection that a cloud Postgres provider silently closed
+# (idle timeout, failover, restart) gets transparently replaced instead of
+# surfacing as a confusing "server closed the connection unexpectedly" error
+# on the next real query. Meaningless for SQLite (no connection pool to
+# stale-check), so only applied on the Postgres branch.
+_engine_kwargs = (
+    {"connect_args": {"check_same_thread": False}}
+    if IS_SQLITE
+    else {"pool_pre_ping": True}
+)
 engine = create_engine(DATABASE_URL, **_engine_kwargs)
 metadata = MetaData()
 

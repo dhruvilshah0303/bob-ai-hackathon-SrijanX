@@ -43,7 +43,7 @@ from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconn
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 
 import config
 config.configure_logging()
@@ -53,7 +53,9 @@ import auth
 import db
 import eta_service
 import ratelimit
+import routing_service
 from recommendation_engine import recommend
+from utils import interpolate_along_path
 
 if config.SENTRY_DSN:
     import sentry_init  # noqa: F401 - side-effect import, initializes Sentry if configured
@@ -234,6 +236,46 @@ def _release_hospital(hospital_id: str, condition_code: str):
     h["last_capacity_update_at"] = _now_iso()
 
 
+def _reservation_block_reason(hospital: dict, condition_code: str) -> str | None:
+    """Validate live capacity under STATE_LOCK before creating a reservation."""
+    rule = state.condition_by_code.get(condition_code, {})
+    required = rule.get("required", [])
+    if hospital.get("accepting_status") == "no":
+        return "hospital is not accepting patients"
+    if "ed_accepting" in required and hospital.get("accepting_status") not in ("yes", "limited"):
+        return "emergency department is not accepting patients"
+    if "icu" in required and hospital.get("icu_beds_free", 0) <= 0:
+        return "no ICU bed is currently available"
+    if hospital.get("ed_bays_occupied", 0) >= hospital.get("ed_bays_total", 0):
+        return "no emergency department bay is currently available"
+    return None
+
+
+def _start_movement_leg(trip: dict, dest_hospital_id: str, eta_min: float) -> int:
+    """Kicks off (or restarts, on reroute) the ambulance's movement toward
+    dest_hospital_id: fetches a real road route (falling back to a straight
+    line if no live routing provider is available - see routing_service.py)
+    so the movement loop can follow actual roads instead of cutting a
+    diagonal line across the map, and sets up the timing the movement loop
+    reads. Returns the new movement_run_id so the caller can pass it to
+    _run_movement_loop (see that function's docstring for why this matters).
+
+    Called with STATE_LOCK already held, same as the ETA lookups in
+    compute_recommendation() - a known simplification (a blocking network
+    call inside the lock), not an oversight; see the code review notes.
+    """
+    dest = state.hospitals[dest_hospital_id]
+    origin = trip["ambulance_pos"]
+    route = routing_service.get_route(origin["lat"], origin["lng"], dest["lat"], dest["lng"], dest_hospital_id)
+    trip["route_points"] = route["points"]
+    trip["route_source"] = route["source"]
+    trip["origin_pos"] = dict(origin)
+    trip["movement_started_at"] = time.time()
+    trip["movement_duration_sec"] = max(4.0, (eta_min * 60) / DEMO_TIME_SCALE)
+    trip["movement_run_id"] = trip.get("movement_run_id", 0) + 1
+    return trip["movement_run_id"]
+
+
 # ---------------------------------------------------------------------------
 # Core recommendation helper
 # ---------------------------------------------------------------------------
@@ -266,6 +308,8 @@ def _new_trip(ambulance_label: Optional[str], incident_location: Optional[dict],
         "dest_hospital_id": None,
         "selection_type": None,
         "override_reason": None,
+        "route_points": None,
+        "route_source": None,
         "recommendation": None,
         "prealert": None,
         "reroute_alert": None,
@@ -291,10 +335,29 @@ def _get_trip_or_404(trip_id: str) -> dict:
 # Request/response models
 # ---------------------------------------------------------------------------
 
+def _strip_control_chars(value: Optional[str]) -> Optional[str]:
+    """Defense-in-depth alongside the frontend's HTML-escaping (see
+    escapeHtml() in app.js): free-text fields get control characters
+    stripped and whitespace trimmed server-side too, for any caller that
+    isn't going through that frontend at all (curl, another client). This
+    doesn't replace escaping on render - a client-side escaping bug would
+    still be a bug - but it shrinks what a non-browser API caller can stuff
+    into these fields in the first place."""
+    if value is None:
+        return None
+    cleaned = "".join(ch for ch in value if ch == "\n" or ch == "\t" or not ord(ch) < 0x20)
+    return cleaned.strip() or None
+
+
 class NewTripRequest(BaseModel):
-    ambulance_label: Optional[str] = None
+    ambulance_label: Optional[str] = Field(default=None, max_length=64)
     incident_location: Optional[dict] = None
     autopilot: bool = False
+
+    @field_validator("ambulance_label")
+    @classmethod
+    def _clean_ambulance_label(cls, v):
+        return _strip_control_chars(v)
 
 
 class CaseRequest(BaseModel):
@@ -303,7 +366,12 @@ class CaseRequest(BaseModel):
 
 class SelectRequest(BaseModel):
     hospital_id: str
-    override_reason: Optional[str] = None
+    override_reason: Optional[str] = Field(default=None, max_length=200)
+
+    @field_validator("override_reason")
+    @classmethod
+    def _clean_override_reason(cls, v):
+        return _strip_control_chars(v)
 
 
 class CapacityUpdate(BaseModel):
@@ -329,6 +397,7 @@ def health():
         "hospitals_loaded": len(state.hospitals),
         "active_trips": len(state.trips),
         "eta_provider": eta_service.provider_status(),
+        "routing_provider": routing_service.provider_status(),
     }
 
 
@@ -338,6 +407,7 @@ def get_scenario():
         "incident_location": state.scenario["incident_location"],
         "conditions": state.severity_rules["conditions"],
         "eta_provider": eta_service.provider_status(),
+        "routing_provider": routing_service.provider_status(),
     }
 
 
@@ -454,8 +524,14 @@ async def select_hospital(trip_id: str, req: SelectRequest):
         snapshot = trip["recommendation"]
         if not snapshot:
             raise HTTPException(status_code=400, detail="no recommendation available yet")
+        if trip["status"] != "recommendation_ready":
+            raise HTTPException(status_code=409, detail="hospital selection is no longer available for this trip")
         if req.hospital_id not in state.hospitals:
             raise HTTPException(status_code=404, detail="hospital not found")
+
+        block_reason = _reservation_block_reason(state.hospitals[req.hospital_id], trip["condition_code"])
+        if block_reason:
+            raise HTTPException(status_code=409, detail=f"cannot reserve hospital: {block_reason}; reassess recommendations")
 
         is_override = req.hospital_id != snapshot["recommended_hospital_id"]
         trip["dest_hospital_id"] = req.hospital_id
@@ -463,14 +539,10 @@ async def select_hospital(trip_id: str, req: SelectRequest):
         trip["selection_type"] = "overridden" if is_override else "accepted"
         trip["override_reason"] = req.override_reason if is_override else None
         trip["status"] = "en_route"
-        trip["movement_started_at"] = time.time()
-        trip["movement_run_id"] = trip.get("movement_run_id", 0) + 1
-        my_run_id = trip["movement_run_id"]
 
         candidate = next((c for c in snapshot["candidates"] if c["hospital_id"] == req.hospital_id), None)
         eta_min = candidate["eta_min"] if candidate else 10
-        trip["movement_duration_sec"] = max(4.0, (eta_min * 60) / DEMO_TIME_SCALE)
-        trip["origin_pos"] = dict(trip["ambulance_pos"])
+        my_run_id = _start_movement_leg(trip, req.hospital_id, eta_min)
 
         state.log("hospital_selected", {
             "trip_id": trip_id,
@@ -524,12 +596,8 @@ async def reroute_response(trip_id: str, req: RerouteResponse):
             trip["dest_hospital_id"] = new_hospital_id
             trip["selection_type"] = "accepted"
             trip["recommendation"] = alert["snapshot"]
-            trip["movement_started_at"] = time.time()
-            trip["movement_run_id"] = trip.get("movement_run_id", 0) + 1
-            my_run_id = trip["movement_run_id"]
-            trip["origin_pos"] = dict(trip["ambulance_pos"])
             candidate = next(c for c in alert["snapshot"]["candidates"] if c["hospital_id"] == new_hospital_id)
-            trip["movement_duration_sec"] = max(4.0, (candidate["eta_min"] * 60) / DEMO_TIME_SCALE)
+            my_run_id = _start_movement_leg(trip, new_hospital_id, candidate["eta_min"])
 
             prealert = {
                 "id": str(uuid.uuid4())[:8],
@@ -631,12 +699,18 @@ async def _run_movement_loop(trip_id: str, run_id: int):
             elapsed = time.time() - started
             frac = min(elapsed / duration, 1.0)
 
-            origin = trip["origin_pos"]
-            dest = state.hospitals[trip["dest_hospital_id"]]
-            trip["ambulance_pos"] = {
-                "lat": origin["lat"] + (dest["lat"] - origin["lat"]) * frac,
-                "lng": origin["lng"] + (dest["lng"] - origin["lng"]) * frac,
-            }
+            # Follows the actual road-route geometry (routing_service.py)
+            # instead of lerping straight between origin and destination
+            # lat/lng, which used to cut a diagonal line across the map
+            # ignoring roads entirely. Falls back to a straight 2-point path
+            # (identical to the old behavior) when no live routing provider
+            # is available - see routing_service.py's docstring.
+            dest_h = state.hospitals[trip["dest_hospital_id"]]
+            path = trip.get("route_points") or [
+                {"lat": trip["origin_pos"]["lat"], "lng": trip["origin_pos"]["lng"]},
+                {"lat": dest_h["lat"], "lng": dest_h["lng"]},
+            ]
+            trip["ambulance_pos"] = interpolate_along_path(path, frac)
 
             arrived = frac >= 1.0
             if arrived:

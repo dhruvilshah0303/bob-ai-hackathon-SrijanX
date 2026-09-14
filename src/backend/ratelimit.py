@@ -26,17 +26,28 @@ _counters: dict[str, tuple[int, int]] = defaultdict(lambda: (0, 0))  # ip -> (wi
 
 
 def _client_ip(request: Request) -> str:
-    # Respect a reverse proxy's forwarded header if present (most hosting
-    # platforms sit behind one); fall back to the direct connection.
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
+    # SECURITY: only trust the "X-Forwarded-For" header when explicitly
+    # configured to (TRUST_PROXY_HEADERS=true) - it's client-controlled and
+    # trusting it blindly lets anyone dodge the rate limit or frame another
+    # IP. Default is to always use the direct connection's address.
+    if config.TRUST_PROXY_HEADERS:
+        forwarded = request.headers.get("x-forwarded-for")
+        if forwarded:
+            return forwarded.split(",")[0].strip()
     return request.client.host if request.client else "unknown"
+
+
+# /api/health is polled frequently by platform health checks / uptime
+# monitors and isn't "real traffic" - it shouldn't eat into the same budget
+# a real client's requests share, or a busy health checker could lock
+# everyone else out.
+_EXEMPT_PATHS = {"/api/health"}
 
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
-        if not config.RATE_LIMIT_ENABLED or not request.url.path.startswith("/api/"):
+        path = request.url.path
+        if not config.RATE_LIMIT_ENABLED or not path.startswith("/api/") or path in _EXEMPT_PATHS:
             return await call_next(request)
 
         ip = _client_ip(request)

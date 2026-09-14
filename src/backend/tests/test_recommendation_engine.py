@@ -186,3 +186,51 @@ def test_recommendation_is_deterministic_for_identical_inputs():
     ids_b = [c["hospital_id"] for c in result_b["candidates"]]
     assert ids_a == ids_b
     assert result_a["recommended_hospital_id"] == result_b["recommended_hospital_id"]
+
+
+def test_score_breakdown_is_exposed_and_matches_the_final_score():
+    """The UI's "how was this calculated" panel renders these per-factor
+    numbers directly - they must be the real components the final score was
+    built from (each weight * value), not a display-only approximation, and
+    they must sum back to the actual score so the panel can never show
+    reasoning that doesn't add up to the number next to it."""
+    hospitals = [
+        make_hospital("h1", "Hospital 1", icu_free=4, icu_total=10, ed_occupied=2, ed_total=10, cardiologist_on_duty=True),
+    ]
+    eta_lookup = {"h1": eta(10)}
+
+    result = recommend(hospitals, eta_lookup, CARDIAC_RULE, WEIGHTS, STALE_THRESHOLD_MIN)
+    cand = result["candidates"][0]
+
+    assert cand["viable"] is True
+    breakdown = cand["score_breakdown"]
+    assert breakdown is not None
+    for key in ("delay", "specialist", "capacity_headroom", "ed_overload_penalty"):
+        assert key in breakdown
+        assert breakdown[key]["weight"] == WEIGHTS[{"delay": "w1_delay", "specialist": "w2_specialist",
+                                                       "capacity_headroom": "w3_capacity_headroom",
+                                                       "ed_overload_penalty": "w4_ed_overload_penalty"}[key]]
+        assert breakdown[key]["contribution"] == round(breakdown[key]["weight"] * breakdown[key]["value"] * (-1 if key == "ed_overload_penalty" else 1), 4)
+
+    # Specialist is on duty and ED is quiet (2/10 = 20% occupied, "normal") -
+    # so the specialist bonus is fully earned and the overload penalty is zero.
+    assert breakdown["specialist"]["value"] == 1.0
+    assert breakdown["ed_overload_penalty"]["value"] == 0.0
+
+    total = sum(f["contribution"] for f in breakdown.values())
+    assert abs(total - cand["score"]) < 1e-6
+
+
+def test_score_breakdown_is_none_for_a_disqualified_hospital():
+    # A non-viable candidate never entered the scoring competition, so there
+    # is nothing honest to show in a "how was this calculated" panel for it -
+    # None (not a zeroed-out breakdown that implies it WAS scored) is what
+    # the frontend checks to decide whether to render that panel at all.
+    hospitals = [make_hospital("h1", "No ICU Hospital", icu_free=0)]
+    eta_lookup = {"h1": eta(5)}
+
+    result = recommend(hospitals, eta_lookup, CARDIAC_RULE, WEIGHTS, STALE_THRESHOLD_MIN)
+    cand = result["candidates"][0]
+
+    assert cand["viable"] is False
+    assert cand["score_breakdown"] is None

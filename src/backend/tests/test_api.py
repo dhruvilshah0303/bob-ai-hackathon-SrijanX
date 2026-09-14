@@ -91,6 +91,38 @@ def test_selecting_a_hospital_reserves_its_capacity():
         assert after_h["icu_beds_free"] == before_h["icu_beds_free"] - 1
 
 
+def test_selection_rejects_stale_capacity_snapshot():
+    trip = create_trip()
+    case_resp = client.post(f"/api/trips/{trip['id']}/case", json={"condition_code": "cardiac"}).json()
+    recommended_id = case_resp["recommendation"]["recommended_hospital_id"]
+    hospital = next(h for h in client.get("/api/hospitals").json() if h["id"] == recommended_id)
+    update = client.post(
+        f"/api/hospitals/{recommended_id}/capacity",
+        json={"icu_beds_free": 0, "ed_bays_occupied": hospital["ed_bays_occupied"]},
+    )
+    assert update.status_code == 200
+
+    response = client.post(f"/api/trips/{trip['id']}/select", json={"hospital_id": recommended_id})
+    assert response.status_code == 409
+    assert "reassess" in response.json()["detail"]
+    assert client.get(f"/api/trips/{trip['id']}").json()["status"] == "recommendation_ready"
+
+
+def test_selection_is_single_use_and_does_not_double_reserve():
+    trip = create_trip()
+    case_resp = client.post(f"/api/trips/{trip['id']}/case", json={"condition_code": "cardiac"}).json()
+    recommended_id = case_resp["recommendation"]["recommended_hospital_id"]
+    first = client.post(f"/api/trips/{trip['id']}/select", json={"hospital_id": recommended_id})
+    assert first.status_code == 200
+    after_first = next(h for h in client.get("/api/hospitals").json() if h["id"] == recommended_id)
+
+    second = client.post(f"/api/trips/{trip['id']}/select", json={"hospital_id": recommended_id})
+    assert second.status_code == 409
+    after_second = next(h for h in client.get("/api/hospitals").json() if h["id"] == recommended_id)
+    assert after_second["icu_beds_free"] == after_first["icu_beds_free"]
+    assert after_second["ed_bays_occupied"] == after_first["ed_bays_occupied"]
+
+
 def test_two_concurrent_trips_are_independent():
     trip_a = create_trip(ambulance_label="AMB-A")
     trip_b = create_trip(ambulance_label="AMB-B")

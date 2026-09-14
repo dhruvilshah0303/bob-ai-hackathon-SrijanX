@@ -185,6 +185,7 @@ def recommend(
     for c in raw_candidates:
         if not c["viable"]:
             c["score"] = 0.0
+            c["score_breakdown"] = None
             continue
         h = next(h for h in hospitals if h["id"] == c["hospital_id"])
         delay_score = _normalize_inverse(c["est_total_treatment_delay_min"], viable_delays)
@@ -199,6 +200,16 @@ def recommend(
             - weights["w4_ed_overload_penalty"] * overload_penalty
         )
         c["score"] = round(max(score, 0.0), 4)
+        # Exposed so the UI can render an honest "how was this calculated"
+        # breakdown instead of a black-box number - every value here is the
+        # actual [0,1] component the final score above was built from times
+        # its actual configured weight, not a display-only approximation.
+        c["score_breakdown"] = {
+            "delay": {"weight": weights["w1_delay"], "value": round(delay_score, 4), "contribution": round(weights["w1_delay"] * delay_score, 4)},
+            "specialist": {"weight": weights["w2_specialist"], "value": round(specialist_bonus, 4), "contribution": round(weights["w2_specialist"] * specialist_bonus, 4)},
+            "capacity_headroom": {"weight": weights["w3_capacity_headroom"], "value": round(capacity_headroom, 4), "contribution": round(weights["w3_capacity_headroom"] * capacity_headroom, 4)},
+            "ed_overload_penalty": {"weight": weights["w4_ed_overload_penalty"], "value": round(overload_penalty, 4), "contribution": round(-weights["w4_ed_overload_penalty"] * overload_penalty, 4)},
+        }
 
     # Sort: viable first (by score desc), then non-viable (by distance asc) for transparency
     viable_sorted = sorted([c for c in raw_candidates if c["viable"]], key=lambda c: -c["score"])

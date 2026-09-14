@@ -11,11 +11,13 @@ services:
       - key: ENVIRONMENT
         value: production
       - key: ALLOWED_ORIGINS
-        value: "*"
+        value: "https://frontend-ruby-iota-56.vercel.app"
       - key: RATE_LIMIT_ENABLED
         value: "true"
       - key: RATE_LIMIT_PER_MINUTE
         value: "120"
+      - key: TRUST_PROXY_HEADERS
+        value: "true"
       - key: DEMO_TIME_SCALE
         value: "10"
       - key: APP_ACCESS_TOKEN
