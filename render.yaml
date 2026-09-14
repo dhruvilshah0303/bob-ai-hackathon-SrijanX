@@ -20,6 +20,8 @@ services:
         value: "true"
       - key: DEMO_TIME_SCALE
         value: "10"
+      - key: PYTHON_VERSION
+        value: "3.11.11"
       - key: APP_ACCESS_TOKEN
         value: ""
       - key: DATABASE_URL
