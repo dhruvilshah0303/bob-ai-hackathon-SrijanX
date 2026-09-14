@@ -31,13 +31,15 @@ The coordinator filters hospitals against the incident severity and current capa
 
 Python, FastAPI, Uvicorn, SQLAlchemy, JavaScript, Leaflet, WebSockets, SQLite/PostgreSQL, Docker, GitHub Actions, and OpenStreetMap.
 
+The backend is configured for Render via `render.yaml`; the static frontend can be deployed to Vercel.
+
 ## Repository Structure
 
 ```text
 src/
   backend/       FastAPI API, recommendation engine, data, and tests
   frontend/      Static dashboard and browser client
-  Dockerfile     Single-container deployment for Railway or similar hosts
+  Dockerfile     Single-container deployment for Render or similar hosts
 docs/             Problem, solution, architecture, and setup documentation
 demo/             Demo links and screenshots
 presentation/     Hackathon presentation assets

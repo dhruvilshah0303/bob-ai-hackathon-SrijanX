@@ -45,7 +45,12 @@ uvicorn app:app --reload --port 8000
 
 Open `http://localhost:8000`. The API serves the static frontend and WebSocket from the same origin.
 
-For a separate frontend deployment, set `window.COORDINATOR_BACKEND_URL` in `src/frontend/config.js` to the Railway backend URL and deploy `src/frontend` as a static Vercel project.
+For a separate frontend deployment, set `window.COORDINATOR_BACKEND_URL` in `src/frontend/config.js` to the Render backend URL and deploy `src/frontend` as a static Vercel project.
+
+For the hosted backend, use the included `render.yaml` Blueprint. It installs
+`src/backend/requirements.txt`, starts Uvicorn on Render's `$PORT`, and exposes
+`/api/health` for service health checks. After Render creates the service, copy
+its public URL into `src/frontend/config.js` before deploying the frontend.
 
 ## Running Tests
 
@@ -79,5 +84,5 @@ docker run --rm -p 8000:8000 ambulance-coordinator
 | `ModuleNotFoundError` | Activate the virtual environment and rerun `python -m pip install -r src/backend/requirements-dev.txt`. |
 | Browser cannot connect | Confirm Uvicorn is running from `src/backend` on port 8000. |
 | Live ETA is simulated | Set `GOOGLE_MAPS_API_KEY` or `MAPBOX_API_KEY`; simulation is the expected no-key fallback. |
-| Cross-origin browser errors | Set backend `ALLOWED_ORIGINS` to the exact Vercel origin and set `frontend/config.js` to the Railway origin. |
+| Cross-origin browser errors | Set backend `ALLOWED_ORIGINS` to the exact Vercel origin and set `frontend/config.js` to the Render origin. |
 | PostgreSQL connection error | Leave `DATABASE_URL` empty for local SQLite, or verify the managed database URL and driver. |
