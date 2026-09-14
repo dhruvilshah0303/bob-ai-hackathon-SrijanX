@@ -9,6 +9,7 @@ An explainable emergency-dispatch dashboard that recommends the hospital where a
 | Team name | SrijanX |
 | Track | AI |
 | Team lead | Dhruvil Shah - 25dcs118@charusat.edu.in |
+| Members	| Moon, Shaunak, Abhi |
 
 ## Problem
 
