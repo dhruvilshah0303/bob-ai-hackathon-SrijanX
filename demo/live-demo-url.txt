@@ -1,1 +1,1 @@
-NOT DEPLOYED - deploy the backend to Render and frontend to Vercel, then replace this line with the public demo URL.
+Vercel frontend deployment pending. Backend: https://ai-ambulance-coordinator-api.onrender.com
