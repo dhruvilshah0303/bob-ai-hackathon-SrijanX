@@ -1,19 +1,18 @@
-# Pinned to specific, currently-tested versions rather than open-ended
-# ">=" ranges, so a fresh `pip install` a year from now can't silently pull
-# in a breaking major release. Bump deliberately, re-run the test suite.
-fastapi==0.115.6
-uvicorn[standard]==0.32.1
-websockets==13.1
-requests==2.32.3
-python-dotenv==1.0.1
-sqlalchemy==2.0.36
-pydantic==2.10.3
+# Keep minimum compatible versions while allowing Render's current Python
+# runtime to resolve wheels instead of compiling an old Rust extension.
+fastapi>=0.115.6
+uvicorn[standard]>=0.32.1
+websockets>=13.1
+requests>=2.32.3
+python-dotenv>=1.0.1
+sqlalchemy>=2.0.36
+pydantic>=2.10.3
 
 # Needed only when DATABASE_URL points at Postgres (e.g. in production on
 # Render/Heroku/Railway/etc). SQLite (the local-dev default) needs nothing
 # extra - sqlite3 ships with Python. Safe to always install.
-psycopg2-binary==2.9.10
+psycopg2-binary>=2.9.10
 
 # Optional - only used if SENTRY_DSN is set (see sentry_init.py). The app
 # runs fine without this installed; it's a no-op until you opt in.
-sentry-sdk==2.19.2
+sentry-sdk>=2.19.2
