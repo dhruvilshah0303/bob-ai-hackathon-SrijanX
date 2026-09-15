@@ -107,11 +107,11 @@ Once validation passes:
 - [✅] `README.md` — no `[placeholder]` text remaining
 - [✅] `docs/setup-guide.md` — someone else can run your project using these instructions
 - [✅] `src/` — all source code committed (no `node_modules`, no `.env`)
-- [ ] `demo/demo-video-link.txt` — real video URL (3–5 min showing the app working)
-- [ ] `demo/screenshots/` — at least 3 screenshots of the running application
-- [ ] `presentation/slides.pdf` — slide deck present
-- [ ] GitHub Actions **✅ Validate Submission** is green
+- [✅] `demo/demo-video-link.txt` — real video URL (3–5 min showing the app working)
+- [✅] `demo/screenshots/` — at least 3 screenshots of the running application
+- [✅] `presentation/slides.pdf` — slide deck present
+- [✅] GitHub Actions **✅ Validate Submission** is green
 - [✅] Repository is **Public**
-- [ ] Entry form submitted before the deadline
+- [✅] Entry form submitted before the deadline
 
 ---
