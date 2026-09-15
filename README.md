@@ -1,4 +1,4 @@
-# AI Ambulance-to-Hospital Coordinator
+# AI Ambulance-to-Hospital Coordinator 
 
 An explainable emergency-dispatch dashboard that recommends the hospital where a patient can reach appropriate treatment fastest, not simply the nearest hospital.
 
