@@ -1,9 +1,9 @@
 [
   {
     "id": "H1",
-    "name": "Sunrise General Hospital",
+    "name": "MPUH Hospital",
     "lat": 23.0395,
-    "lng": 72.5660,
+    "lng": 72.566,
     "ed_bays_total": 12,
     "ed_bays_occupied": 4,
     "icu_beds_total": 8,
@@ -12,9 +12,18 @@
     "ward_beds_free": 12,
     "accepting_status": "yes",
     "specialists": [
-      {"type": "cardiologist", "on_duty": false},
-      {"type": "neurologist", "on_duty": true},
-      {"type": "trauma_surgeon", "on_duty": true}
+      {
+        "type": "cardiologist",
+        "on_duty": false
+      },
+      {
+        "type": "neurologist",
+        "on_duty": true
+      },
+      {
+        "type": "trauma_surgeon",
+        "on_duty": true
+      }
     ],
     "avg_historical_wait_min": 10,
     "last_capacity_update_at": "2026-09-14T09:58:00+05:30",
@@ -22,9 +31,9 @@
   },
   {
     "id": "H2",
-    "name": "Riverside Medical Center",
-    "lat": 23.0510,
-    "lng": 72.6050,
+    "name": "Civil Hospital",
+    "lat": 23.051,
+    "lng": 72.605,
     "ed_bays_total": 20,
     "ed_bays_occupied": 9,
     "icu_beds_total": 15,
@@ -33,9 +42,18 @@
     "ward_beds_free": 25,
     "accepting_status": "yes",
     "specialists": [
-      {"type": "cardiologist", "on_duty": true},
-      {"type": "neurologist", "on_duty": false},
-      {"type": "trauma_surgeon", "on_duty": true}
+      {
+        "type": "cardiologist",
+        "on_duty": true
+      },
+      {
+        "type": "neurologist",
+        "on_duty": false
+      },
+      {
+        "type": "trauma_surgeon",
+        "on_duty": true
+      }
     ],
     "avg_historical_wait_min": 8,
     "last_capacity_update_at": "2026-09-14T09:59:00+05:30",
@@ -43,7 +61,7 @@
   },
   {
     "id": "H3",
-    "name": "Metro Care Hospital",
+    "name": "Shubham Hospital",
     "lat": 23.0225,
     "lng": 72.5714,
     "ed_bays_total": 10,
@@ -54,9 +72,18 @@
     "ward_beds_free": 4,
     "accepting_status": "limited",
     "specialists": [
-      {"type": "cardiologist", "on_duty": false},
-      {"type": "neurologist", "on_duty": false},
-      {"type": "trauma_surgeon", "on_duty": true}
+      {
+        "type": "cardiologist",
+        "on_duty": false
+      },
+      {
+        "type": "neurologist",
+        "on_duty": false
+      },
+      {
+        "type": "trauma_surgeon",
+        "on_duty": true
+      }
     ],
     "avg_historical_wait_min": 22,
     "last_capacity_update_at": "2026-09-14T09:45:00+05:30",
@@ -64,9 +91,9 @@
   },
   {
     "id": "H4",
-    "name": "Lakeside Trauma & Heart Institute",
-    "lat": 23.0640,
-    "lng": 72.5300,
+    "name": "Utkarsh Hospital",
+    "lat": 23.064,
+    "lng": 72.53,
     "ed_bays_total": 16,
     "ed_bays_occupied": 6,
     "icu_beds_total": 12,
@@ -75,9 +102,18 @@
     "ward_beds_free": 18,
     "accepting_status": "yes",
     "specialists": [
-      {"type": "cardiologist", "on_duty": true},
-      {"type": "neurologist", "on_duty": true},
-      {"type": "trauma_surgeon", "on_duty": false}
+      {
+        "type": "cardiologist",
+        "on_duty": true
+      },
+      {
+        "type": "neurologist",
+        "on_duty": true
+      },
+      {
+        "type": "trauma_surgeon",
+        "on_duty": false
+      }
     ],
     "avg_historical_wait_min": 6,
     "last_capacity_update_at": "2026-09-14T10:00:00+05:30",
@@ -85,9 +121,9 @@
   },
   {
     "id": "H5",
-    "name": "St. Xavier's Community Hospital",
-    "lat": 22.9950,
-    "lng": 72.5950,
+    "name": "Sparsh Hospital",
+    "lat": 22.995,
+    "lng": 72.595,
     "ed_bays_total": 8,
     "ed_bays_occupied": 2,
     "icu_beds_total": 4,
@@ -96,9 +132,18 @@
     "ward_beds_free": 15,
     "accepting_status": "yes",
     "specialists": [
-      {"type": "cardiologist", "on_duty": false},
-      {"type": "neurologist", "on_duty": false},
-      {"type": "trauma_surgeon", "on_duty": false}
+      {
+        "type": "cardiologist",
+        "on_duty": false
+      },
+      {
+        "type": "neurologist",
+        "on_duty": false
+      },
+      {
+        "type": "trauma_surgeon",
+        "on_duty": false
+      }
     ],
     "avg_historical_wait_min": 5,
     "last_capacity_update_at": "2026-09-14T09:50:00+05:30",

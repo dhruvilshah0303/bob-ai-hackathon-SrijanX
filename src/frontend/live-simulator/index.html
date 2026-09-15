@@ -13,7 +13,7 @@
      shipped can keep using its cached copy of these files indefinitely
      (StaticFiles doesn't force revalidation), silently showing old bugs as
      if the fix never landed. Bump on every meaningful frontend change. -->
-<link rel="stylesheet" href="style.css?v=2026-09-15-theme" />
+<link rel="stylesheet" href="style.css?v=2026-09-15-watsonx2" />
 </head>
 <body>
 
@@ -93,7 +93,14 @@
     <div class="card" id="assessCard">
       <h3>Patient severity assessment</h3>
       <p class="hint">Tell us what's wrong so the recommendation engine can weigh every hospital's actual ability to treat it — not just how close it is.</p>
-      <label for="conditionSelect">Suspected condition</label>
+
+      <label for="triageNoteInput">AI Triage Assist — dispatcher note <span class="muted">(optional)</span></label>
+      <textarea id="triageNoteInput" rows="2" placeholder="e.g. 55yo male, crushing chest pain radiating to left arm, sweating"></textarea>
+      <button id="triageSuggestBtn" class="btn btn-secondary full" type="button">🧠 Suggest condition with AI</button>
+      <p class="hint" id="triageProviderLine"></p>
+      <div id="triageResult" class="triage-result" hidden></div>
+
+      <label for="conditionSelect" class="condition-label">Suspected condition</label>
       <select id="conditionSelect">
         <option value="" disabled selected>— Select a condition —</option>
       </select>
@@ -184,7 +191,7 @@
     <div class="table-scroll">
       <table class="hosp-table" id="hospTable">
         <thead>
-          <tr><th>Hospital</th><th>ED bays</th><th>ICU free</th><th>Ward free</th><th>Accepting</th><th>Specialists on duty</th><th>Updated</th></tr>
+          <tr><th>Hospital</th><th>ED bays</th><th>ICU free</th><th>ICU trend</th><th>Ward free</th><th>Accepting</th><th>Specialists on duty</th><th>Updated</th></tr>
         </thead>
         <tbody></tbody>
       </table>
@@ -197,6 +204,11 @@
   <section class="analytics-view">
     <h2>📊 Emergency Response Analytics</h2>
     <div class="kpi-grid" id="kpiGrid"></div>
+
+    <h3>Hospital load — recommended vs. selected</h3>
+    <p class="hint">Every case the AI has scored, versus where crews actually ended up going — a hospital whose "selected" bar consistently lags its "recommended" bar is one crews are frequently overriding.</p>
+    <div id="hospitalLeaderboard" class="leaderboard"></div>
+
     <h3>Audit log</h3>
     <div class="table-scroll">
       <table class="audit-table" id="auditTable">
@@ -210,6 +222,6 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="config.js"></script>
 <script src="effects.js"></script>
-<script src="app.js?v=2026-09-15-theme"></script>
+<script src="app.js?v=2026-09-15-watsonx2"></script>
 </body>
 </html>

@@ -57,6 +57,52 @@ def test_unknown_condition_code_returns_400():
     assert r.status_code == 400
 
 
+def test_triage_suggest_returns_a_known_condition_code():
+    trip = create_trip()
+    r = client.post(f"/api/trips/{trip['id']}/triage", json={"note": "chest pain, sweating, crushing pressure"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["condition_code"] == "cardiac"
+    assert body["source"] in ("watsonx", "keyword_fallback")
+    assert 0.0 <= body["confidence"] <= 1.0
+    # Suggesting a condition must not itself set the trip's condition/status -
+    # the dispatcher still has to confirm via POST .../case (see triage_service.py).
+    trip_after = client.get(f"/api/trips/{trip['id']}").json()
+    assert trip_after["condition_code"] is None
+    assert trip_after["status"] == "awaiting_assessment"
+
+
+def test_triage_suggest_rejects_empty_note():
+    trip = create_trip()
+    r = client.post(f"/api/trips/{trip['id']}/triage", json={"note": "   "})
+    assert r.status_code == 422
+
+
+def test_triage_suggest_unknown_trip_id_returns_404():
+    r = client.post("/api/trips/does-not-exist/triage", json={"note": "chest pain"})
+    assert r.status_code == 404
+
+
+def test_selecting_a_hospital_sends_a_prealert_with_a_handover_note():
+    # No WATSONX_API_KEY/WATSONX_PROJECT_ID in the test environment, so this
+    # exercises the template_fallback path end-to-end - but the point is the
+    # prealert always carries a usable handover_note, live model or not.
+    trip = create_trip()
+    client.post(f"/api/trips/{trip['id']}/triage", json={"note": "chest pain, sweating, crushing pressure"})
+    case_resp = client.post(f"/api/trips/{trip['id']}/case", json={"condition_code": "cardiac"}).json()
+    recommended_id = case_resp["recommendation"]["recommended_hospital_id"]
+
+    trip_after = client.post(f"/api/trips/{trip['id']}/select", json={"hospital_id": recommended_id}).json()
+    prealert = trip_after["prealert"]
+    assert prealert is not None
+    assert prealert["handover_note"]
+    assert prealert["handover_source"] in ("watsonx", "template_fallback")
+    # The dispatcher's own free-text note should be reflected in the
+    # fallback template (proves the note round-tripped from the /triage
+    # call through to the prealert, not just the structured condition).
+    assert "chest pain" in prealert["handover_note"]
+
+
 def test_select_before_case_returns_400():
     trip = create_trip()
     r = client.post(f"/api/trips/{trip['id']}/select", json={"hospital_id": "H1"})

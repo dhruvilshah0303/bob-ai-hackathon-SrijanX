@@ -15,7 +15,10 @@ const state = {
   ws: null,
   pendingOverrideHospitalId: null,
   simHospitalUserPicked: false, 
+  capacityHistory: {},   // hospital_id -> rolling list of {t, icu_free, icu_total, ed_occupied, ed_total} - see recordCapacitySnapshot()
 };
+
+const CAPACITY_HISTORY_MAX_POINTS = 30;
 
 const BACKEND_ORIGIN = (window.COORDINATOR_BACKEND_URL || "").replace(/\/$/, "");
 
@@ -558,6 +561,9 @@ function renderTripStatus(trip) {
   }
   if (pre) {
     html += `<div class="status-line">Pre-alert: ${pre.acknowledged_at ? '<span class="badge ok">acknowledged by hospital</span>' : '<span class="badge warn">sent, awaiting ack</span>'}</div>`;
+    if (pre.handover_note) {
+      html += `<div class="status-line muted">Hospital briefed: "${escapeHtml(pre.handover_note)}"</div>`;
+    }
   }
   $("#tripStatus").innerHTML = html;
 }
@@ -643,11 +649,65 @@ function conditionSeverity(code) {
   return c ? c.severity : null;
 }
 
+const SEVERITY_RANK = { Red: 3, Yellow: 2, Green: 1 };
+
+function severityRank(code) {
+  return SEVERITY_RANK[conditionSeverity(code)] || 0;
+}
+
+function severityClass(code) {
+  const sev = conditionSeverity(code);
+  return sev ? `sev-${sev.toLowerCase()}` : "";
+}
+
+// Real seconds remaining until this trip's ambulance actually reaches its
+// destination, synced to the same accelerated demo-time movement clock the
+// map animation itself uses (movement_started_at/movement_duration_sec are
+// both real wall-clock seconds - see app.py's _start_movement_leg) - NOT a
+// literal countdown of prealert.eta_min real-world minutes, which would
+// drift out of sync with what's actually happening on the map under
+// DEMO_TIME_SCALE acceleration.
+function remainingSeconds(trip) {
+  if (!trip.movement_started_at || !trip.movement_duration_sec) return null;
+  const elapsed = Date.now() / 1000 - trip.movement_started_at;
+  return Math.max(0, trip.movement_duration_sec - elapsed);
+}
+
+function formatCountdown(totalSeconds) {
+  const secs = Math.round(totalSeconds);
+  if (secs <= 0) return "arriving now";
+  const m = Math.floor(secs / 60);
+  const s = secs % 60;
+  return m > 0 ? `${m}m ${s}s` : `${s}s`;
+}
+
+function tickPrealertCountdowns() {
+  $$("[data-countdown-trip]").forEach((el) => {
+    const deadline = Number(el.dataset.deadline);
+    if (!deadline) return;
+    el.textContent = formatCountdown((deadline - Date.now()) / 1000);
+  });
+}
+
 function renderHospitalView() {
   const panel = $("#prealertPanel");
-  const alertTrips = Object.values(state.allTrips).filter((t) => t.prealert);
+  // Priority-sorted, not arrival order: clinical severity first (a Red
+  // case always outranks a Yellow/Green one, regardless of who called
+  // first), then soonest-arriving within the same severity tier - this is
+  // "which bed do I need to free up next", not "who alerted us first".
+  const alertTrips = Object.values(state.allTrips)
+    .filter((t) => t.prealert)
+    .sort((a, b) => {
+      const sevDiff = severityRank(b.condition_code) - severityRank(a.condition_code);
+      if (sevDiff !== 0) return sevDiff;
+      const ra = remainingSeconds(a);
+      const rb = remainingSeconds(b);
+      if (ra === null && rb === null) return 0;
+      if (ra === null) return 1;
+      if (rb === null) return -1;
+      return ra - rb;
+    });
 
-  
   const kpiGrid = $("#hospitalKpiGrid");
   if (kpiGrid) {
     const critical = alertTrips.filter((t) => conditionSeverity(t.condition_code) === "Red").length;
@@ -662,13 +722,28 @@ function renderHospitalView() {
   if (alertTrips.length === 0) {
     panel.innerHTML = `<p class="muted">No active pre-alerts yet. Select a destination hospital in the Dispatcher tab.</p>`;
   } else {
-    panel.innerHTML = alertTrips.map((t) => {
+    panel.innerHTML = alertTrips.map((t, i) => {
       const pre = t.prealert;
       const h = state.hospitals[pre.hospital_id];
-      return `<div class="prealert-panel active">
-        <h4><span class="icon">🔔</span> Incoming: ${escapeHtml(t.ambulance_label)} → ${escapeHtml(h ? h.name : pre.hospital_id)}</h4>
-        <p><b>Condition:</b> ${escapeHtml(pre.condition_label || "—")} &nbsp; <b>ETA:</b> ${Math.round(pre.eta_min)} min</p>
+      const remaining = remainingSeconds(t);
+      const deadlineMs = remaining !== null ? Date.now() + remaining * 1000 : null;
+      const isTopPriority = i === 0 && alertTrips.length > 1;
+      const isLiveHandover = pre.handover_source === "watsonx";
+      return `<div class="prealert-panel active ${severityClass(t.condition_code)}">
+        <h4>
+          <span class="icon">🔔</span> Incoming: ${escapeHtml(t.ambulance_label)} → ${escapeHtml(h ? h.name : pre.hospital_id)}
+          ${isTopPriority ? '<span class="badge bad">⏱ Next in queue</span>' : ""}
+        </h4>
+        <p><b>Condition:</b> ${escapeHtml(pre.condition_label || "—")} &nbsp; <b>Arriving:</b> ${
+          deadlineMs !== null
+            ? `<span class="countdown" data-countdown-trip="${escapeHtml(t.id)}" data-deadline="${deadlineMs}">${formatCountdown(remaining)}</span>`
+            : `${Math.round(pre.eta_min)} min`
+        }</p>
         <p><b>Sent at:</b> ${new Date(pre.sent_at).toLocaleTimeString()}</p>
+        ${pre.handover_note ? `<div class="handover-note">
+          <span class="badge ${isLiveHandover ? "ok" : "warn"}">${isLiveHandover ? "IBM watsonx.ai · Granite" : "Template fallback"}</span>
+          <p>"${escapeHtml(pre.handover_note)}"</p>
+        </div>` : ""}
         ${pre.acknowledged_at
           ? `<p class="badge ok">Acknowledged at ${new Date(pre.acknowledged_at).toLocaleTimeString()}</p>`
           : `<button class="btn btn-primary" data-ack="${escapeHtml(t.id)}">Acknowledge — prepare team</button>`}
@@ -681,6 +756,7 @@ function renderHospitalView() {
         await postJSON(`/api/trips/${tripId}/prealert/acknowledge`);
       }));
     });
+    tickPrealertCountdowns();
   }
 
   const tbody = $("#hospTable tbody");
@@ -691,6 +767,7 @@ function renderHospitalView() {
       <td><b>${escapeHtml(h.name)}</b></td>
       <td>${capacityBar(h.ed_bays_occupied, h.ed_bays_total, "occupied")}</td>
       <td>${capacityBar(h.icu_beds_total - h.icu_beds_free, h.icu_beds_total, "free-inverted", h.icu_beds_free)}</td>
+      <td>${renderCapacitySparkline(h.id)}</td>
       <td>${h.ward_beds_free}/${h.ward_beds_total}</td>
       <td>${escapeHtml(h.accepting_status)}</td>
       <td>${escapeHtml(specs)}</td>
@@ -699,6 +776,52 @@ function renderHospitalView() {
   });
 }
 
+
+function recordCapacitySnapshot(hospitals) {
+  // Called every time state.hospitals is (re)assigned - from the initial
+  // fetch, every "hospitals_updated" websocket push (manual capacity edits
+  // AND real bed reservation/release on selection or cancellation both go
+  // through this), and demo reset. This is the only place capacity history
+  // is captured, so the Hospital View's ICU trend sparkline reflects every
+  // real change, not just the manually-edited "simulate a live change"
+  // scenarios.
+  const now = Date.now();
+  Object.values(hospitals || {}).forEach((h) => {
+    const hist = state.capacityHistory[h.id] || (state.capacityHistory[h.id] = []);
+    const last = hist[hist.length - 1];
+    if (last && last.icu_free === h.icu_beds_free && last.ed_occupied === h.ed_bays_occupied) {
+      return; // unchanged since the last recorded point - don't clutter the line with flat duplicates
+    }
+    hist.push({
+      t: now,
+      icu_free: h.icu_beds_free,
+      icu_total: h.icu_beds_total,
+      ed_occupied: h.ed_bays_occupied,
+      ed_total: h.ed_bays_total,
+    });
+    if (hist.length > CAPACITY_HISTORY_MAX_POINTS) hist.shift();
+  });
+}
+
+function renderCapacitySparkline(hospitalId) {
+  const hist = state.capacityHistory[hospitalId];
+  if (!hist || hist.length < 2) {
+    return `<span class="muted spark-empty">no history yet</span>`;
+  }
+  const total = hist[hist.length - 1].icu_total || 1;
+  const w = 84, h = 22, pad = 2;
+  const points = hist.map((p, i) => {
+    const x = pad + (hist.length === 1 ? 0 : (i / (hist.length - 1)) * (w - pad * 2));
+    const frac = total > 0 ? Math.max(0, Math.min(1, p.icu_free / total)) : 0;
+    const y = h - pad - frac * (h - pad * 2);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(" ");
+  const last = hist[hist.length - 1];
+  const trendCls = last.icu_free === 0 ? "crit" : (last.icu_free <= Math.max(1, Math.round(total * 0.2)) ? "warn" : "ok");
+  return `<svg class="spark spark-${trendCls}" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" role="img" aria-label="ICU-free beds trend, currently ${last.icu_free} of ${total}">
+    <polyline points="${points}" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" />
+  </svg>`;
+}
 
 function capacityBar(usedCount, total, mode, freeCount) {
   if (!total) return `<span class="muted">n/a</span>`;
@@ -791,6 +914,52 @@ function describeAuditEvent(e) {
   }
 }
 
+function computeHospitalLeaderboard(audit) {
+  const recommended = {};
+  const selected = {};
+  audit.forEach((e) => {
+    const p = e.payload || {};
+    if (e.event_type === "recommendation_generated" && p.recommended_hospital_id) {
+      recommended[p.recommended_hospital_id] = (recommended[p.recommended_hospital_id] || 0) + 1;
+    } else if (e.event_type === "hospital_selected" && p.hospital_id) {
+      selected[p.hospital_id] = (selected[p.hospital_id] || 0) + 1;
+    }
+  });
+  // Include every hospital that exists, even one that's never been
+  // recommended or selected yet - a zero-activity row is itself useful
+  // information ("this one has never come up"), not noise to hide.
+  const ids = new Set([...Object.keys(state.hospitals), ...Object.keys(recommended), ...Object.keys(selected)]);
+  return Array.from(ids)
+    .map((id) => ({ id, name: hospitalName(id), recommended: recommended[id] || 0, selected: selected[id] || 0 }))
+    .sort((a, b) => (b.recommended + b.selected) - (a.recommended + a.selected));
+}
+
+function renderHospitalLeaderboard(rows) {
+  const el = $("#hospitalLeaderboard");
+  if (!el) return;
+  if (rows.length === 0) {
+    el.innerHTML = `<p class="muted">No cases yet.</p>`;
+    return;
+  }
+  const max = Math.max(1, ...rows.map((r) => Math.max(r.recommended, r.selected)));
+  el.innerHTML = `
+    <div class="leaderboard-legend">
+      <span><i class="legend-swatch legend-rec"></i>Recommended by AI</span>
+      <span><i class="legend-swatch legend-sel"></i>Actually selected</span>
+    </div>
+    ${rows.map((r) => `
+      <div class="leaderboard-row">
+        <div class="leaderboard-name" title="${escapeHtml(r.name)}">${escapeHtml(r.name)}</div>
+        <div class="leaderboard-bars">
+          <div class="leaderboard-bar-track"><div class="leaderboard-bar rec" style="width:${Math.max(2, (r.recommended / max) * 100)}%"></div></div>
+          <div class="leaderboard-bar-track"><div class="leaderboard-bar sel" style="width:${Math.max(2, (r.selected / max) * 100)}%"></div></div>
+        </div>
+        <div class="leaderboard-counts muted">${r.recommended} / ${r.selected}</div>
+      </div>
+    `).join("")}
+  `;
+}
+
 async function loadAnalytics() {
   const [kpis, audit] = await Promise.all([getJSON("/api/analytics"), getJSON("/api/audit")]);
   if (!kpis || !audit) return;
@@ -804,6 +973,7 @@ async function loadAnalytics() {
     <div class="kpi"><div class="value">${Math.round(kpis.prealert_ack_rate * 100)}%</div><div class="label">Pre-alert ack rate</div></div>
     <div class="kpi"><div class="value">${kpis.active_trips}</div><div class="label">Active ambulances now</div></div>
   `;
+  renderHospitalLeaderboard(computeHospitalLeaderboard(audit));
   const tbody = $("#auditTable tbody");
   tbody.innerHTML = "";
   
@@ -814,6 +984,33 @@ async function loadAnalytics() {
       <td>${describeAuditEvent(e)}</td>
     </tr>`;
   });
+}
+
+function setTriageProviderLine(triageProvider) {
+  const el = $("#triageProviderLine");
+  if (!el || !triageProvider) return;
+  el.textContent = triageProvider.active_mode === "watsonx"
+    ? `Powered by IBM watsonx.ai (${triageProvider.model_id}).`
+    : "Fallback mode: labeled keyword classifier (no watsonx.ai credentials configured).";
+}
+
+function renderTriageSuggestion(suggestion) {
+  const el = $("#triageResult");
+  if (!el) return;
+  const condition = (state.scenario?.conditions || []).find((c) => c.code === suggestion.condition_code);
+  const label = condition ? condition.label : suggestion.condition_code;
+  const isLive = suggestion.source === "watsonx";
+
+  el.className = isLive ? "triage-result" : "triage-result fallback";
+  el.hidden = false;
+  el.innerHTML = `
+    <div class="triage-result-head">
+      <span class="badge ${isLive ? "ok" : "warn"}">${isLive ? `IBM watsonx.ai · ${escapeHtml(suggestion.model_id || "Granite")}` : "Keyword fallback"}</span>
+      <span class="muted">confidence ${Math.round(suggestion.confidence * 100)}%</span>
+    </div>
+    <div class="triage-result-suggestion">Suggested: <b>${escapeHtml(label)}</b></div>
+    <div class="triage-result-reason">${escapeHtml(suggestion.reasoning)}</div>
+  `;
 }
 
 function populateSelects(conditions, hospitals) {
@@ -843,6 +1040,25 @@ function setupControls() {
   $("#conditionSelect").addEventListener("change", (e) => {
     assessBtn.disabled = !e.target.value;
   });
+
+  const triageBtn = $("#triageSuggestBtn");
+  if (triageBtn) {
+    triageBtn.addEventListener("click", withBusyButton(triageBtn, async () => {
+      const noteInput = $("#triageNoteInput");
+      const note = (noteInput.value || "").trim();
+      if (!note) {
+        toast("Type a dispatcher note first, e.g. the symptoms the caller described.", "error");
+        return;
+      }
+      const suggestion = await postJSON(`/api/trips/${state.myTripId}/triage`, { note });
+      if (suggestion) {
+        renderTriageSuggestion(suggestion);
+        setTriageProviderLine({ active_mode: suggestion.source === "watsonx" ? "watsonx" : "keyword_fallback", model_id: suggestion.model_id });
+        $("#conditionSelect").value = suggestion.condition_code;
+        assessBtn.disabled = !suggestion.condition_code;
+      }
+    }));
+  }
   assessBtn.addEventListener("click", withBusyButton(assessBtn, async () => {
     const code = $("#conditionSelect").value;
     if (!code) return;
@@ -926,11 +1142,15 @@ function setupControls() {
     state.simHospitalUserPicked = false;
     $("#conditionSelect").value = "";
     $("#assessBtn").disabled = true;
+    if ($("#triageNoteInput")) $("#triageNoteInput").value = "";
+    if ($("#triageResult")) $("#triageResult").hidden = true;
+    state.capacityHistory = {};
     await postJSON("/api/reset");
     await startMyTrip();
     const hospitals = await getJSON("/api/hospitals");
     if (hospitals) {
       state.hospitals = Object.fromEntries(hospitals.map((h) => [h.id, h]));
+      recordCapacitySnapshot(state.hospitals);
       renderHospitalsOnMap(state.hospitals);
     }
     renderAll();
@@ -978,6 +1198,7 @@ function connectWs() {
 
     if (msg.type === "hospitals_updated") {
       state.hospitals = Object.fromEntries(msg.hospitals.map((h) => [h.id, h]));
+      recordCapacitySnapshot(state.hospitals);
       renderHospitalsOnMap(state.hospitals);
       renderAll();
     }
@@ -1034,7 +1255,7 @@ async function init() {
   setupControls();
   setupAccessGate();
   tickClock();
-  setInterval(tickClock, 1000);
+  setInterval(() => { tickClock(); tickPrealertCountdowns(); }, 1000);
 
   const scenario = await getJSON("/api/scenario");
   if (!scenario) {
@@ -1043,9 +1264,11 @@ async function init() {
   }
   state.scenario = scenario;
   $("#etaProviderBadge").textContent = `ETA source: ${scenario.eta_provider.active_mode === "live_api" ? "live traffic API" : "simulated (no API key configured)"}`;
+  setTriageProviderLine(scenario.triage_provider);
 
   const hospitalsList = await getJSON("/api/hospitals");
   state.hospitals = Object.fromEntries((hospitalsList || []).map((h) => [h.id, h]));
+  recordCapacitySnapshot(state.hospitals);
 
   try {
     initMap(scenario.incident_location);

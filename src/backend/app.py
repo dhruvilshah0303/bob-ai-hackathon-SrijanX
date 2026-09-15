@@ -54,6 +54,7 @@ import db
 import eta_service
 import ratelimit
 import routing_service
+import triage_service
 from recommendation_engine import recommend
 from utils import interpolate_along_path
 
@@ -296,6 +297,8 @@ def _new_trip(ambulance_label: Optional[str], incident_location: Optional[dict],
         "route_points": None,
         "route_source": None,
         "recommendation": None,
+        "last_triage_suggestion": None,
+        "last_triage_note": None,
         "prealert": None,
         "reroute_alert": None,
         "movement_started_at": None,
@@ -349,6 +352,23 @@ class CaseRequest(BaseModel):
     condition_code: str
 
 
+class TriageRequest(BaseModel):
+    """A dispatcher's free-text note, e.g. '55yo male, crushing chest pain,
+    sweating, radiating to left arm' - classified into a suggested
+    condition_code by triage_service.classify() (IBM watsonx.ai Granite,
+    with a keyword-classifier fallback). This never sets the trip's
+    condition directly; the dispatcher still confirms via POST .../case."""
+    note: str = Field(min_length=1, max_length=1000)
+
+    @field_validator("note")
+    @classmethod
+    def _clean_note(cls, v):
+        cleaned = _strip_control_chars(v)
+        if not cleaned:
+            raise ValueError("note must not be empty")
+        return cleaned
+
+
 class SelectRequest(BaseModel):
     hospital_id: str
     override_reason: Optional[str] = Field(default=None, max_length=200)
@@ -383,6 +403,7 @@ def health():
         "active_trips": len(state.trips),
         "eta_provider": eta_service.provider_status(),
         "routing_provider": routing_service.provider_status(),
+        "triage_provider": triage_service.provider_status(),
     }
 
 
@@ -393,6 +414,7 @@ def get_scenario():
         "conditions": state.severity_rules["conditions"],
         "eta_provider": eta_service.provider_status(),
         "routing_provider": routing_service.provider_status(),
+        "triage_provider": triage_service.provider_status(),
     }
 
 
@@ -479,6 +501,28 @@ async def discard_trip(trip_id: str):
     return {"ok": True}
 
 
+@app.post("/api/trips/{trip_id}/triage")
+async def suggest_triage(trip_id: str, req: TriageRequest):
+    """AI Triage Assist: classifies req.note into a suggested condition_code
+    (does not itself change the trip's condition - see TriageRequest)."""
+    async with STATE_LOCK:
+        trip = _get_trip_or_404(trip_id)
+        conditions = state.severity_rules["conditions"]
+        suggestion = triage_service.classify(req.note, conditions)
+        trip["last_triage_suggestion"] = suggestion
+        trip["last_triage_note"] = req.note
+
+        state.log("triage_suggested", {
+            "trip_id": trip_id,
+            "note": req.note,
+            "suggested_condition_code": suggestion["condition_code"],
+            "confidence": suggestion["confidence"],
+            "source": suggestion["source"],
+        })
+
+    return suggestion
+
+
 @app.post("/api/trips/{trip_id}/case")
 async def create_case(trip_id: str, req: CaseRequest):
     async with STATE_LOCK:
@@ -530,16 +574,35 @@ async def select_hospital(trip_id: str, req: SelectRequest):
             "override_reason": trip["override_reason"],
         })
 
+        # AI hospital handover note: a short natural-language sentence for
+        # the receiving ED (not just a bare condition code + ETA), via
+        # IBM watsonx.ai with a deterministic template fallback - see
+        # triage_service.generate_handover_note()'s docstring.
+        destination_hospital = state.hospitals.get(req.hospital_id, {})
+        handover = triage_service.generate_handover_note(
+            trip.get("last_triage_note") or "",
+            state.condition_by_code.get(trip["condition_code"], {}),
+            eta_min,
+            destination_hospital.get("name", req.hospital_id),
+        )
+
         prealert = {
             "id": str(uuid.uuid4())[:8],
             "hospital_id": req.hospital_id,
             "sent_at": _now_iso(),
             "condition_label": snapshot["condition_label"],
             "eta_min": eta_min,
+            "handover_note": handover["summary"],
+            "handover_source": handover["source"],
             "acknowledged_at": None,
         }
         trip["prealert"] = prealert
-        state.log("prealert_sent", {"trip_id": trip_id, "hospital_id": req.hospital_id, "eta_min": eta_min})
+        state.log("prealert_sent", {
+            "trip_id": trip_id,
+            "hospital_id": req.hospital_id,
+            "eta_min": eta_min,
+            "handover_source": handover["source"],
+        })
 
     await _broadcast_hospitals()
     await _broadcast_trip(trip)

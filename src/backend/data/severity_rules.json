@@ -4,36 +4,110 @@
       "code": "cardiac",
       "label": "Suspected Heart Attack / Cardiac Event",
       "severity": "Red",
-      "required": ["icu", "ed_accepting"],
-      "preferred_specialist": "cardiologist"
+      "required": [
+        "icu",
+        "ed_accepting"
+      ],
+      "preferred_specialist": "cardiologist",
+      "keywords": [
+        "chest pain",
+        "heart attack",
+        "cardiac arrest",
+        "crushing chest",
+        "tightness in chest",
+        "left arm pain",
+        "arm numbness",
+        "myocardial",
+        "palpitations",
+        "collapsed clutching chest"
+      ]
     },
     {
       "code": "stroke",
       "label": "Suspected Stroke",
       "severity": "Red",
-      "required": ["icu", "ed_accepting"],
-      "preferred_specialist": "neurologist"
+      "required": [
+        "icu",
+        "ed_accepting"
+      ],
+      "preferred_specialist": "neurologist",
+      "keywords": [
+        "stroke",
+        "facial droop",
+        "face drooping",
+        "slurred speech",
+        "one-sided weakness",
+        "one sided weakness",
+        "sudden confusion",
+        "sudden numbness",
+        "arm weakness",
+        "cannot speak",
+        "fast test"
+      ]
     },
     {
       "code": "trauma",
       "label": "Major Trauma / Accident",
       "severity": "Red",
-      "required": ["icu", "ed_accepting"],
-      "preferred_specialist": "trauma_surgeon"
+      "required": [
+        "icu",
+        "ed_accepting"
+      ],
+      "preferred_specialist": "trauma_surgeon",
+      "keywords": [
+        "accident",
+        "collision",
+        "crash",
+        "fall from height",
+        "gunshot",
+        "stabbed",
+        "stabbing",
+        "fracture",
+        "head injury",
+        "bleeding heavily",
+        "severe bleeding",
+        "unconscious",
+        "multiple injuries",
+        "hit by car"
+      ]
     },
     {
       "code": "urgent_stable",
       "label": "Urgent but Stable",
       "severity": "Yellow",
-      "required": ["ed_accepting"],
-      "preferred_specialist": null
+      "required": [
+        "ed_accepting"
+      ],
+      "preferred_specialist": null,
+      "keywords": [
+        "abdominal pain",
+        "high fever",
+        "difficulty breathing",
+        "shortness of breath",
+        "allergic reaction",
+        "persistent vomiting",
+        "dehydrated",
+        "severe pain"
+      ]
     },
     {
       "code": "non_critical",
       "label": "Non-Critical",
       "severity": "Green",
-      "required": ["ed_accepting"],
-      "preferred_specialist": null
+      "required": [
+        "ed_accepting"
+      ],
+      "preferred_specialist": null,
+      "keywords": [
+        "minor cut",
+        "small laceration",
+        "sprain",
+        "twisted ankle",
+        "mild pain",
+        "minor injury",
+        "bruise",
+        "small wound"
+      ]
     }
   ],
   "scoring_weights": {

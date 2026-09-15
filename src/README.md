@@ -13,11 +13,11 @@ build order in TRD Section 14.
 
 * A working **AI Recommendation Engine** (`backend/recommendation_engine.py`)
   implementing the constraint-filter + weighted-scoring model from TRD
-  Section 5, with full explainability, and **89 passing pytest tests**
+  Section 5, with full explainability, and **120 passing pytest tests**
   covering its edge cases (no viable hospital, ties, stale data, disqualified-
   nearest-hospital), the API's error paths and reservation logic, road
-  routing, and the security-hardening layer described below (see
-  `backend/tests/`).
+  routing, AI Triage Assist's watsonx.ai/keyword-fallback classification, and
+  the security-hardening layer described below (see `backend/tests/`).
 * **Multiple concurrent ambulances.** Hospital capacity is a single shared
   resource every ambulance competes for — the system tracks any number of
   simultaneous trips, not just one. Click **"Launch a second ambulance"** in
@@ -32,6 +32,35 @@ build order in TRD Section 14.
   the live call fails. The simulated traffic factor is now seeded per trip so
   rankings stay stable through a trip instead of flickering between
   recomputes.
+* **AI Triage Assist** (`backend/triage_service.py`): a dispatcher types a
+  free-text note (e.g. "55yo male, crushing chest pain radiating to left
+  arm") and it's classified into a suggested condition code by **IBM
+  watsonx.ai**, calling a Granite instruct model's text-generation API — the
+  suggestion just prefills the condition dropdown, it never sets the
+  condition itself, so the dispatcher still confirms it (same "decision
+  support, not authority" principle as the rest of the app). Same
+  real-provider-with-graceful-fallback shape as the ETA/routing services: no
+  `WATSONX_API_KEY`/`WATSONX_PROJECT_ID` configured, or a live call fails,
+  and it transparently falls back to a labeled keyword classifier instead of
+  breaking the demo or guessing silently — see `/api/health`'s
+  `triage_provider` for which one actually answered.
+* **AI hospital handover note** (`triage_service.generate_handover_note`):
+  the same watsonx.ai Granite model drafts a short, natural-language
+  clinical handover sentence (not just a bare condition code) that goes out
+  with the hospital pre-alert — e.g. *"55yo male, crushing substernal chest
+  pain radiating to left arm, ETA 9 min, requesting cardiologist
+  availability."* Falls back to a deterministic template built from the
+  same structured fields (condition, severity, specialist, ETA, and the
+  dispatcher's own note if one was given) when watsonx.ai isn't configured
+  or a live call fails — the receiving hospital always sees a real sentence,
+  never a raw JSON blob or a missing field. Shown on both ends: the
+  Hospital View pre-alert card, and the dispatcher's own Trip Status.
+* **Priority-sorted incoming queue** (Hospital View): pre-alerts are ranked
+  by clinical severity first, then soonest-arriving within the same
+  severity tier — not by who alerted first — with a live countdown synced
+  to the same accelerated demo-time movement clock the map animation uses,
+  and a "⏱ Next in queue" badge on the top case whenever more than one
+  ambulance is inbound.
 * A **live map demo** (Leaflet/OpenStreetMap): every active ambulance
   animates from its incident scene to its selected hospital in accelerated
   demo-time, **following the actual road route** (`backend/routing_service.py`,
@@ -108,9 +137,10 @@ build order in TRD Section 14.
   unavailable, ED overloaded, cardiologist on/off duty), each writing one
   real capacity change through the same endpoint a hospital's own
   dashboard would use.
-* A **landing/pitch page** at `frontend/site/index.html` (served at
-  `/site/` by the existing static mount, linking back to the live app),
-  built from the PRD/TRD and the app's own design tokens.
+* A **landing/pitch page** at `frontend/index.html` (served at the app's
+  root `/` by the existing static mount), built from the PRD/TRD and the
+  app's own design tokens, linking to the actual dispatcher console below
+  via its "Launch Console" / "Launch Live Simulator" buttons.
 * **A second harsh-judge design-review pass** (see "Design review fixes,
   round 2" below): the hospital comparison is now a genuine, compact
   `<table>` instead of stacked cards even on desktop, so all 5 hospitals
@@ -131,8 +161,12 @@ pip install -r requirements.txt
 uvicorn app:app --reload --port 8000
 ```
 
-Then open **http://localhost:8000** in a browser. That's it — the backend
-also serves the frontend, so there's nothing else to run or build.
+Then open **http://localhost:8000** in a browser — that's the landing/pitch
+page. Click **"Launch Console"** (or go straight to
+**http://localhost:8000/live-simulator/**) to open the actual dispatcher
+console, which is where the live demo (map, recommendation engine, hospital
+view, analytics) runs. That's it — the backend also serves both frontends,
+so there's nothing else to run or build.
 
 A `local.env` file with a real Google Maps API key is already included in
 `backend/`, so real traffic-aware ETA is on by default — check the badge in
@@ -144,6 +178,14 @@ the demo works either way. **Before pushing this repo anywhere public (e.g.
 a GitHub repo for judging), double check `local.env` isn't committed — it's
 in `.gitignore`, but verify with `git status`.**
 
+AI Triage Assist works the same way: set `WATSONX_API_KEY` and
+`WATSONX_PROJECT_ID` in `local.env`/`.env` (see `.env.example` for where to
+get them) to have the "Suggest condition with AI" button call IBM
+watsonx.ai's Granite model for real. Leave them blank and it automatically
+uses the keyword classifier instead — the assess card tells you which one is
+active (and `/api/health`'s `triage_provider.active_mode` reports it too),
+so the demo works, and is honest about which mode it's in, either way.
+
 ### Running the tests
 
 ```bash
@@ -152,11 +194,13 @@ pip install -r requirements-dev.txt
 python3 -m pytest tests/ -v
 ```
 
-89 tests, no network or real server needed (FastAPI's `TestClient` runs the
-app in-process) — covers the recommendation engine's edge cases, the API's
-error handling / reservation logic, road routing, and the security-hardening
-layer (auth, rate limiting, config parsing, XSS defense-in-depth). The same
-command can be run locally before deployment.
+120 tests, no network or real server needed (FastAPI's `TestClient` runs the
+app in-process, and the watsonx.ai call is mocked - see
+`tests/test_triage_service.py`) — covers the recommendation engine's edge
+cases, the API's error handling / reservation logic, road routing, AI Triage
+Assist's watsonx.ai/keyword-fallback classification, and the
+security-hardening layer (auth, rate limiting, config parsing, XSS
+defense-in-depth). The same command can be run locally before deployment.
 
 A separate, optional file (`tests/test_frontend_smoke.py`) drives a real
 Chromium browser via Playwright to check things a Python-only test can't:
@@ -202,9 +246,11 @@ is loud instead of silent. Full details on every env var are in
 
 ## Demo script (suggested)
 
-1. Open the app. You'll see the incident marker, 5 hospitals color-coded by
-   status (green = accepting, orange = limited, red = not viable/no ICU),
-   and your ambulance.
+1. Open the landing page (`http://localhost:8000`) and click **"Launch
+   Console"** to open the dispatcher console (`/live-simulator/`) in a new
+   tab — that's where the rest of this script happens. You'll see the
+   incident marker, 5 hospitals color-coded by status (green = accepting,
+   orange = limited, red = not viable/no ICU), and your ambulance.
 2. Pick **"Suspected Heart Attack / Cardiac Event"** and click **Assess &
    Get AI Recommendation**. Point at the hero card: the recommended hospital,
    its ETA, estimated treatment delay, and the reasoning behind the pick, all
@@ -448,6 +494,52 @@ bottom-right and were re-verified with zero overlap; and the hero
 recommendation's label was confirmed wrapping to two lines at the panel's
 width, so it was shortened and re-verified on one line.
 
+## Code review fixes (post-launch hardening pass)
+
+A full read-through of the PRD/TRD, delivery notes, and the entire codebase
+(prompted by a "study everything and tell me what needs fixing" pass) turned
+up one real functional bug and several project-hygiene gaps. All are now
+fixed and verified:
+
+* **P0 — the landing page silently created a real ambulance trip on every
+  visit.** The landing/pitch page's `frontend/app.js` was a near-duplicate
+  of the dispatcher console's own `app.js`, and its `init()` still called
+  `startMyTrip()` (a `POST /api/trips`) and opened a live WebSocket on
+  every single load of `frontend/index.html` — not just the actual
+  dispatcher console. That meant anyone just reading the pitch page (a
+  judge, a link shared casually) silently spawned a phantom ambulance,
+  polluting the fleet list and the Analytics audit trail with trips nobody
+  dispatched. Root cause: the rest of that `init()` targeted DOM elements
+  (`#map`, `#conditionSelect`, `#hospTable`, etc.) that don't exist on the
+  landing page, so it silently no-opped after creating the trip — the bug
+  was invisible unless you were watching the audit log. Fixed by trimming
+  the landing page's `app.js` from 838 lines to 293: removed the entire
+  dead dispatcher block and replaced `init()` with only the three calls the
+  landing page actually needs (`setupNavigation()`,
+  `setupAnimatedCounters()`, `initTheme()`). Verified with `node --check`
+  and a grep pass confirming `index.html` has zero references to any
+  removed function (`initMap`, `startMyTrip`, `connectWs`, `renderAll`,
+  and others).
+* **Project had no CI or version control.** `ci.yml` (pytest on every
+  push/PR, plus a Docker build sanity check) was sitting in an unrelated
+  delivery-notes folder outside the repo, so GitHub Actions would never
+  have picked it up — moved to its correct location,
+  `.github/workflows/ci.yml`. The project also had no git repository at
+  all; initialized one at `prototype/` (the app root) with a `.gitignore`
+  covering `.venv/`, `__pycache__/`, `.pytest_cache/`, `.env`/`local.env`
+  at any depth, and the local SQLite database files, and made an initial
+  commit.
+* **This README had drifted from the actual code in three places** —
+  fixed: the Quick Start and Demo Script sections implied
+  `http://localhost:8000` opens the dispatcher console directly, when it
+  actually opens the landing page (the console is one click away, at
+  `/live-simulator/`); the "What's included" list claimed the landing page
+  lived at `frontend/site/index.html` (no such path exists — it's
+  `frontend/index.html`, served at the app root); and the Project
+  Structure tree was missing `frontend/live-simulator/` entirely and
+  mislabeled the root `frontend/index.html` as the map/recommendation
+  dispatcher dashboard, when that's actually the landing page.
+
 ## Notes on what's simplified for the demo (see TRD for the full design)
 
 * Persistence is SQLite for the audit log / trip history only — live,
@@ -485,6 +577,7 @@ prototype/
     recommendation_engine.py   The AI scoring/reasoning engine (TRD Section 5)
     eta_service.py             Real ETA API wrapper + seeded simulated fallback
     routing_service.py         Real road-route wrapper (Google/Mapbox Directions) + straight-line fallback
+    triage_service.py          IBM watsonx.ai triage classification + handover notes, keyword/template fallback
     db.py                      SQLAlchemy persistence (SQLite locally, Postgres via DATABASE_URL)
     env_loader.py              Reads .env / local.env
     utils.py                   Distance + freshness helpers + road-route interpolation
@@ -501,16 +594,25 @@ prototype/
       test_ratelimit.py               Rate limiter tests, incl. the X-Forwarded-For spoof regression test
       test_config.py                  Env-var parsing + startup-warning tests
       test_security_escaping.py       Backend XSS defense-in-depth (length caps, control-char stripping)
+      test_triage_service.py          AI Triage Assist: watsonx.ai classification + handover notes + keyword/template fallback
       test_frontend_smoke.py          Optional real-browser (Playwright) smoke + XSS + mobile-overflow tests
     requirements.txt
     requirements-dev.txt       Adds pytest/httpx/playwright for the test suite
     pytest.ini
     .env.example
   frontend/
-    index.html                 Map + recommendation dashboard + hospital view + analytics
+    index.html                 Landing/pitch page — links to the dispatcher console below
     app.js
     style.css
+    live-simulator/
+      index.html                Dispatcher console: map, recommendation engine, hospital view, analytics
+      app.js
+      style.css
   Dockerfile                   Single-container deploy (backend + static frontend), non-root, HEALTHCHECK
   Procfile                     Heroku-style process declaration
   .dockerignore
+  .gitignore
+  .github/
+    workflows/
+      ci.yml                    GitHub Actions: pytest on push/PR + a Docker build sanity check
 ```

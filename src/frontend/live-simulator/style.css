@@ -334,7 +334,7 @@ details.card p.hint:first-of-type { margin-top: 0; }
 
 label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
 
-select, input[type="text"] {
+select, input[type="text"], textarea {
   width: 100%;
   background: var(--bg);
   border: 1px solid var(--border);
@@ -344,6 +344,8 @@ select, input[type="text"] {
   margin-bottom: 10px;
   font-size: 13px;
 }
+textarea { resize: vertical; font-family: inherit; min-height: 44px; }
+.condition-label { margin-top: 4px; }
 
 .value-prop {
   font-size: 12px;
@@ -357,6 +359,100 @@ select, input[type="text"] {
   margin-bottom: 12px;
 }
 .value-prop b { color: var(--accent-2); }
+
+.triage-result {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text);
+  background: rgba(34, 197, 94, 0.08);
+  border: 1px solid rgba(34, 197, 94, 0.35);
+  border-left: 3px solid var(--accent);
+  border-radius: 8px;
+  padding: 9px 11px;
+  margin: 4px 0 12px;
+}
+.triage-result.fallback {
+  background: rgba(245, 158, 11, 0.08);
+  border-color: rgba(245, 158, 11, 0.35);
+  border-left-color: var(--warn);
+}
+.triage-result-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+.triage-result-suggestion { margin-bottom: 4px; }
+.triage-result-suggestion b { color: var(--text); }
+.triage-result-reason { color: var(--muted); }
+
+/* Hospital View - ICU-free capacity sparkline (per-hospital trend, built
+   from a client-side rolling history of hospitals_updated events - see
+   recordCapacitySnapshot() in app.js). Color follows the same ok/warn/crit
+   thresholds as capacityBar() so the trend and the current-value bar never
+   disagree about how worried to be. */
+.spark { display: block; vertical-align: middle; }
+.spark-ok { color: var(--accent); }
+.spark-warn { color: var(--warn); }
+.spark-crit { color: var(--danger); }
+.spark-empty { font-size: 10px; white-space: nowrap; }
+
+/* Analytics - hospital leaderboard (recommended vs. selected counts per
+   hospital), a plain two-bar-per-row comparison rather than a full
+   charting library - consistent with capacityBar()'s div-based bars
+   elsewhere in this file. */
+.leaderboard { margin-bottom: 18px; }
+.leaderboard-legend {
+  display: flex;
+  gap: 16px;
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+.legend-swatch {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  margin-right: 5px;
+  vertical-align: middle;
+}
+.legend-rec { background: var(--accent); }
+.legend-sel { background: var(--accent-2); }
+.leaderboard-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+.leaderboard-row:last-child { border-bottom: none; }
+.leaderboard-name {
+  flex: 0 0 128px;
+  font-size: 12px;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.leaderboard-bars { flex: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.leaderboard-bar-track {
+  position: relative;
+  background: var(--bg);
+  border-radius: 4px;
+  height: 12px;
+  display: flex;
+  align-items: center;
+}
+.leaderboard-bar {
+  height: 100%;
+  border-radius: 4px;
+  min-width: 2px;
+  transition: width 0.3s ease;
+}
+.leaderboard-bar.rec { background: var(--accent); }
+.leaderboard-bar.sel { background: var(--accent-2); }
+.leaderboard-counts {
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
 
 .decision-support-note {
   display: flex;
@@ -608,7 +704,30 @@ th { color: var(--muted); font-weight: 600; font-size: 10px; text-transform: upp
   margin: 14px 0 24px;
 }
 .prealert-panel.active { border-color: var(--accent-2); box-shadow: 0 0 0 2px rgba(99,102,241,.2); }
-.prealert-panel h4 { margin: 0 0 8px; }
+.prealert-panel h4 { margin: 0 0 8px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+/* Priority-sorted incoming queue: a left accent bar matching each case's
+   clinical severity, so the sort order (Red first, then soonest-arriving)
+   is visible at a glance, not just implied by list position. */
+.prealert-panel.sev-red { border-left: 3px solid var(--danger); }
+.prealert-panel.sev-yellow { border-left: 3px solid var(--warn); }
+.prealert-panel.sev-green { border-left: 3px solid var(--accent); }
+.countdown { font-variant-numeric: tabular-nums; font-weight: 600; }
+
+/* AI hospital handover note (triage_service.generate_handover_note) - the
+   plain-language sentence sent with the pre-alert, styled like the
+   dispatcher-side .triage-result callout so the two clearly read as the
+   same feature shown on both ends of the same pre-alert. */
+.handover-note {
+  background: rgba(99, 102, 241, 0.08);
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  border-left: 3px solid var(--accent-2);
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin: 8px 0;
+  font-size: 12px;
+}
+.handover-note p { margin: 6px 0 0; color: var(--text); line-height: 1.5; font-style: italic; }
 
 .kpi-grid {
   display: grid;

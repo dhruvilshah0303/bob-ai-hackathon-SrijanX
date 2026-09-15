@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.venv/
+venv/
+*.egg-info/
+
+# Environment / secrets
+.env
+local.env
+**/.env
+**/local.env
+
+# Database
+backend/coordinator.db
+backend/coordinator.db-journal
+*.db
+*.db-journal
+
+# Editor / OS cruft
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*~
