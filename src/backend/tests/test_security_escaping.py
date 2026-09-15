@@ -118,13 +118,7 @@ def test_override_reason_discarded_when_accepting_the_recommendation():
 def test_override_reason_on_a_true_override_is_stored_verbatim():
     trip_id, recommended_id = _trip_ready_for_selection()
     hospitals = client.get("/api/hospitals").json()
-    other = next(
-        h for h in hospitals
-        if h["id"] != recommended_id
-        and h["accepting_status"] in ("yes", "limited")
-        and h["icu_beds_free"] > 0
-        and h["ed_bays_occupied"] < h["ed_bays_total"]
-    )
+    other = next(h for h in hospitals if h["id"] != recommended_id)
     r = client.post(f"/api/trips/{trip_id}/select", json={"hospital_id": other["id"], "override_reason": IMG_PAYLOAD})
     assert r.status_code == 200
     trip = client.get(f"/api/trips/{trip_id}").json()
@@ -135,13 +129,7 @@ def test_override_reason_on_a_true_override_is_stored_verbatim():
 def test_override_reason_over_max_length_is_rejected():
     trip_id, recommended_id = _trip_ready_for_selection()
     hospitals = client.get("/api/hospitals").json()
-    other = next(
-        h for h in hospitals
-        if h["id"] != recommended_id
-        and h["accepting_status"] in ("yes", "limited")
-        and h["icu_beds_free"] > 0
-        and h["ed_bays_occupied"] < h["ed_bays_total"]
-    )
+    other = next(h for h in hospitals if h["id"] != recommended_id)
     r = client.post(f"/api/trips/{trip_id}/select", json={"hospital_id": other["id"], "override_reason": "x" * 201})
     assert r.status_code == 422
 
@@ -149,13 +137,7 @@ def test_override_reason_over_max_length_is_rejected():
 def test_override_reason_control_characters_are_stripped():
     trip_id, recommended_id = _trip_ready_for_selection()
     hospitals = client.get("/api/hospitals").json()
-    other = next(
-        h for h in hospitals
-        if h["id"] != recommended_id
-        and h["accepting_status"] in ("yes", "limited")
-        and h["icu_beds_free"] > 0
-        and h["ed_bays_occupied"] < h["ed_bays_total"]
-    )
+    other = next(h for h in hospitals if h["id"] != recommended_id)
     r = client.post(f"/api/trips/{trip_id}/select", json={
         "hospital_id": other["id"], "override_reason": "closer\x00to\x01family",
     })

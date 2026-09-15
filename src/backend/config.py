@@ -5,8 +5,7 @@ Centralized runtime configuration, read once from environment variables
 Every setting here has a safe, zero-friction default for local development -
 nothing in this file requires configuration to run `uvicorn app:app` on your
 laptop. Each one becomes meaningful the moment you deploy somewhere real;
-see PRODUCTION_READINESS_RECOMMENDATIONS.md and the README's Deployment
-section for what to set and why.
+see the README's Deployment section for what to set and why.
 """
 import logging
 import os

@@ -236,21 +236,6 @@ def _release_hospital(hospital_id: str, condition_code: str):
     h["last_capacity_update_at"] = _now_iso()
 
 
-def _reservation_block_reason(hospital: dict, condition_code: str) -> str | None:
-    """Validate live capacity under STATE_LOCK before creating a reservation."""
-    rule = state.condition_by_code.get(condition_code, {})
-    required = rule.get("required", [])
-    if hospital.get("accepting_status") == "no":
-        return "hospital is not accepting patients"
-    if "ed_accepting" in required and hospital.get("accepting_status") not in ("yes", "limited"):
-        return "emergency department is not accepting patients"
-    if "icu" in required and hospital.get("icu_beds_free", 0) <= 0:
-        return "no ICU bed is currently available"
-    if hospital.get("ed_bays_occupied", 0) >= hospital.get("ed_bays_total", 0):
-        return "no emergency department bay is currently available"
-    return None
-
-
 def _start_movement_leg(trip: dict, dest_hospital_id: str, eta_min: float) -> int:
     """Kicks off (or restarts, on reroute) the ambulance's movement toward
     dest_hospital_id: fetches a real road route (falling back to a straight
@@ -524,14 +509,8 @@ async def select_hospital(trip_id: str, req: SelectRequest):
         snapshot = trip["recommendation"]
         if not snapshot:
             raise HTTPException(status_code=400, detail="no recommendation available yet")
-        if trip["status"] != "recommendation_ready":
-            raise HTTPException(status_code=409, detail="hospital selection is no longer available for this trip")
         if req.hospital_id not in state.hospitals:
             raise HTTPException(status_code=404, detail="hospital not found")
-
-        block_reason = _reservation_block_reason(state.hospitals[req.hospital_id], trip["condition_code"])
-        if block_reason:
-            raise HTTPException(status_code=409, detail=f"cannot reserve hospital: {block_reason}; reassess recommendations")
 
         is_override = req.hospital_id != snapshot["recommended_hospital_id"]
         trip["dest_hospital_id"] = req.hospital_id

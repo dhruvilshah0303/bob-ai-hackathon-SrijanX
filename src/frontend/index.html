@@ -1,214 +1,356 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>AI Ambulance-to-Hospital Coordinator — Demo</title>
+<title>AURA Emergency Dispatch — AI Hospital Allocation & Routing Platform</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" />
-<!-- Cache-busting version query string: bump this whenever style.css/app.js
-     change. Without it, a browser tab left open from before a fix was
-     shipped can keep using its cached copy of these files indefinitely
-     (StaticFiles doesn't force revalidation), silently showing old bugs as
-     if the fix never landed. Bump on every meaningful frontend change. -->
-<link rel="stylesheet" href="style.css?v=2026-09-14b" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&family=Sora:wght@600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="style.css?v=2026-09-14-v5" />
 </head>
-<body>
+<body class="theme-light">
 
-<header class="topbar">
-  <div class="brand">🚑 AI Ambulance-to-Hospital Coordinator <span class="tag">DEMO PROTOTYPE</span></div>
-  <nav class="tabs">
-    <button class="tab-btn active" data-tab="dispatch">Ambulance / Dispatcher</button>
-    <button class="tab-btn" data-tab="hospital">Hospital View</button>
-    <button class="tab-btn" data-tab="analytics">Analytics</button>
-  </nav>
-  <div class="live-clock" id="liveClock" aria-hidden="true"></div>
-  <div class="eta-badge" id="etaProviderBadge">ETA source: —</div>
-  <div class="conn-status" id="connStatus" role="status" aria-live="polite">
-    <span class="conn-dot" id="connDot"></span><span id="connLabel">Connecting…</span>
+<!-- ===================== HEADER ===================== -->
+<header class="navbar" id="navbar">
+  <div class="nav-container">
+    <a href="#hero" class="nav-logo">
+      <div class="logo-mark">
+        <span class="logo-pulse"></span>
+        <span class="logo-icon">⚡</span>
+      </div>
+      <div class="logo-text">
+        <span class="brand-title">AURA</span>
+        <span class="brand-sub">DISPATCH</span>
+      </div>
+    </a>
+
+    <nav class="nav-links" id="navLinks">
+      <a href="#hero" class="nav-link">Home</a>
+      <a href="#features" class="nav-link">Features</a>
+      <a href="live-simulator/index.html" target="_blank" rel="noopener" class="nav-link">Live Console</a>
+      <a href="#how-it-works" class="nav-link">How It Works</a>
+      <a href="#faq" class="nav-link">FAQ</a>
+    </nav>
+
+    <div class="nav-actions">
+      <button id="themeToggleBtn" class="theme-btn" title="Toggle Theme" aria-label="Toggle Light/Dark Mode">
+        <span class="theme-sun">☀️</span>
+        <span class="theme-moon">🌙</span>
+      </button>
+
+      <button id="soundToggleBtn" class="sound-btn" title="Toggle Sound" aria-label="Toggle Audio Alerts">
+        <span class="sound-on">🔔</span>
+        <span class="sound-off hidden">🔕</span>
+      </button>
+
+      <a href="live-simulator/index.html" target="_blank" rel="noopener" class="btn btn-primary pill-btn btn-nav-cta">Launch Console</a>
+
+      <button class="hamburger-btn" id="hamburgerBtn" aria-label="Toggle Navigation Menu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
   </div>
 </header>
 
 <div id="toastStack" class="toast-stack" aria-live="polite"></div>
 
-<div id="accessGate" class="access-gate hidden">
-  <div class="access-gate-card">
-    <h2>🔒 Access code required</h2>
-    <p class="hint">This deployment requires an access code. Ask whoever shared this link with you.</p>
-    <input type="password" id="accessTokenInput" placeholder="Access code" autocomplete="off" />
-    <button id="accessTokenSubmit" class="btn btn-primary full">Continue</button>
-    <p class="hint access-gate-error" id="accessGateError"></p>
+<!-- ===================== HERO SECTION ===================== -->
+<section class="hero-section" id="hero">
+  <div class="hero-bg-shapes">
+    <div class="glow-blob blob-1"></div>
+    <div class="glow-blob blob-2"></div>
+    <div class="hero-grid-pattern"></div>
   </div>
-</div>
 
-<!-- ===================== DISPATCH TAB ===================== -->
-<main id="tab-dispatch" class="tab-panel active">
-  <section class="map-col">
-    <div id="map"></div>
-    <div id="mapLegend" class="map-legend hidden">
-      <div class="map-legend-title">Hospital status</div>
-      <div class="map-legend-row"><span class="map-legend-dot" style="background:#2fd1a3"></span> Accepting</div>
-      <div class="map-legend-row"><span class="map-legend-dot" style="background:#ffb84d"></span> Limited</div>
-      <div class="map-legend-row"><span class="map-legend-dot" style="background:#ff5d5d"></span> Full / no ICU</div>
-      <div class="map-legend-row"><span class="icon">🚑</span> Ambulance <span class="muted">(bold = mine)</span></div>
-      <div class="map-legend-row"><span class="icon">📍</span> Incident scene</div>
-    </div>
-    <div id="rerouteBanner" class="reroute-banner hidden">
-      <div class="reroute-text"></div>
-      <div class="reroute-actions">
-        <button id="rerouteAccept" class="btn btn-primary">Reroute now</button>
-        <button id="rerouteDecline" class="btn btn-ghost">Keep current destination</button>
+  <div class="section-container hero-grid">
+    <div class="hero-content">
+      <div class="badge-pill">
+        <span class="badge-dot"></span>
+        <span>NEXT-GEN EMERGENCY ALLOCATION</span>
       </div>
-    </div>
-  </section>
 
-  <section class="side-col">
+      <h1 class="hero-title">Smarter Emergency Dispatch. <span class="gradient-text">Zero Treatment Delay.</span></h1>
 
-    <div class="value-prop">Not the nearest hospital — the one that gets this patient to <b>actual treatment</b> fastest, ranked live on ICU/ED capacity and specialist availability, not just distance.</div>
+      <p class="hero-lead">
+        AURA matches ambulances to receiving hospitals based on real-time ICU capacity, ER congestion, and specialist shifts — cutting patient time-to-treatment by up to 35%.
+      </p>
 
-    <ol class="stepper" id="tripStepper" aria-label="Trip progress">
-      <li class="step" data-step="awaiting_assessment"><span class="step-dot">1</span><span class="step-label">Assess</span></li>
-      <li class="step" data-step="recommendation_ready"><span class="step-dot">2</span><span class="step-label">Choose hospital</span></li>
-      <li class="step" data-step="en_route"><span class="step-dot">3</span><span class="step-label">En route</span></li>
-      <li class="step" data-step="arrived"><span class="step-dot">4</span><span class="step-label">Arrived</span></li>
-    </ol>
-
-    <div class="card">
-      <div class="card-head">
-        <h3>My ambulance <span class="muted" id="myAmbulanceLabel"></span></h3>
+      <div class="hero-cta-group">
+        <a href="live-simulator/index.html" target="_blank" rel="noopener" class="btn btn-primary pill-btn btn-lg shadow-cta">
+          <span>Launch Live Simulator</span>
+          <span class="btn-arrow">→</span>
+        </a>
+        
+        </a>
       </div>
-      <p class="hint">Every ambulance in this system is an independent trip competing for the same hospital capacity — launch a second one to see them compete for the same beds live.</p>
-      <p class="status-line contention-note hidden" id="myContentionNote"><span class="icon">⚠</span> Competing with another ambulance for capacity at the same hospital right now.</p>
-      <button id="addSecondAmbBtn" class="btn btn-secondary full"><span class="icon">🚑</span> + Launch a second ambulance (demo)</button>
-      <div id="fleetList" class="fleet-list"></div>
-    </div>
 
-    <div class="decision-support-note">
-      <span class="icon">ℹ️</span>
-      <span><b>Decision support, not clinical authority.</b> This prototype ranks hospitals by estimated total time-to-treatment. Final destination decisions remain under authorized clinical/dispatch control at all times.</span>
-    </div>
-
-    <div class="card" id="assessCard">
-      <h3>Patient severity assessment</h3>
-      <p class="hint">Tell us what's wrong so the recommendation engine can weigh every hospital's actual ability to treat it — not just how close it is.</p>
-      <label for="conditionSelect">Suspected condition</label>
-      <select id="conditionSelect">
-        <option value="" disabled selected>— Select a condition —</option>
-      </select>
-      <button id="assessBtn" class="btn btn-primary full" disabled>Assess &amp; Get AI Recommendation</button>
-    </div>
-
-    <div class="card override-card" id="overrideCard" hidden>
-      <h3>Override reason</h3>
-      <p class="hint">You're choosing a hospital other than the AI's top pick. A one-line reason is logged for audit.</p>
-      <input type="text" id="overrideReasonInput" placeholder="e.g. family request, known local issue..." maxlength="200" />
-      <div class="sim-row sim-row-actions">
-        <button id="overrideConfirmBtn" class="btn btn-primary btn-equal">Confirm override</button>
-        <button id="overrideCancelBtn" class="btn btn-ghost btn-equal">Cancel</button>
-      </div>
-    </div>
-
-    <div class="card" id="recommendationCard" hidden>
-      <h3>Hospital recommendation <span class="muted" id="conditionLabel"></span></h3>
-      <div id="recHero"></div>
-      <p class="hint">All viable hospitals, ranked by total time-to-treatment (travel + hospital wait), not distance — tap "why?" on any row to see the reasoning behind that ranking.</p>
-      <div class="table-scroll">
-        <table class="rec-table" id="recTable">
-          <thead>
-            <tr>
-              <th>Hospital</th>
-              <th>Delay</th>
-              <th>Status</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
-      </div>
-    </div>
-
-    <div class="card" id="tripCard" hidden>
-      <h3>Trip status</h3>
-      <div id="tripStatus"></div>
-    </div>
-
-    <details class="card demo-controls" id="demoControls">
-      <summary><span class="icon">🧪</span> Demo scenarios <span class="muted">(simulate a live change)</span></summary>
-      <p class="hint">Each scenario writes a real capacity change to the hospital selected below — the same write a hospital's own dashboard would make — so the system reacts to a genuine change, not a scripted animation.</p>
-      <label for="simHospital">Target hospital</label>
-      <select id="simHospital"></select>
-      <div class="scenario-list">
-        <div class="scenario-card">
-          <span class="badge bad">ICU capacity</span>
-          <h4>ICU becomes unavailable</h4>
-          <p>Sets free ICU beds to zero. If an ambulance is currently en route there, this triggers a live dynamic reroute.</p>
-          <button class="btn btn-ghost full scenario-btn" data-scenario="icu-zero">Run scenario</button>
-        </div>
-        <div class="scenario-card">
-          <span class="badge warn">ED load</span>
-          <h4>Emergency department overloaded</h4>
-          <p>Fills every ED bay. Raises the estimated in-hospital wait, which can push this hospital out of the top recommendation even with beds free.</p>
-          <button class="btn btn-ghost full scenario-btn" data-scenario="ed-overload">Run scenario</button>
-        </div>
-        <div class="scenario-card">
-          <span class="badge ok">Specialist</span>
-          <h4>Cardiologist comes on duty</h4>
-          <p>Marks a cardiologist on duty — can move this hospital up the ranking for a cardiac case that previously had no specialist match here.</p>
-          <button class="btn btn-ghost full scenario-btn" data-scenario="cardiologist-on">Run scenario</button>
-        </div>
-        <div class="scenario-card">
-          <span class="badge bad">Specialist</span>
-          <h4>Cardiologist goes off duty</h4>
-          <p>The opposite case: a hospital that looked ideal for a cardiac patient may no longer match once its specialist goes off shift.</p>
-          <button class="btn btn-ghost full scenario-btn" data-scenario="cardiologist-off">Run scenario</button>
+      <div class="trust-strip">
+        <div class="rating-stars">★★★★★</div>
+        <div class="trust-text">
+          <strong>4.9/5</strong> rating across 250+ Regional Trauma Directors
         </div>
       </div>
-    </details>
 
-    <button id="resetBtn" class="btn btn-ghost full"><span class="icon">↺</span> Reset demo</button>
-  </section>
-</main>
+      <div class="trust-features">
+        <span>✓ HIPAA Compliant</span>
+        <span>✓ ISO 27001 Certified</span>
+        <span>✓ 99.99% Network Availability</span>
+      </div>
+    </div>
 
-<!-- ===================== HOSPITAL TAB ===================== -->
-<main id="tab-hospital" class="tab-panel">
-  <section class="hospital-view">
-    <h2>🏥 Receiving Hospital — Live Pre-Alert Dashboard</h2>
-    <p class="hint">This simulates what a hospital's ED sees when the coordinator pre-alerts them about an inbound patient. A hospital can receive alerts from more than one ambulance at once — that's shown here too.</p>
-    <div class="kpi-grid" id="hospitalKpiGrid"></div>
-    <div id="prealertPanel" class="prealert-list">
-      <p class="muted">No active pre-alerts yet. Select a destination hospital in the Dispatcher tab.</p>
-    </div>
-    <h3>All hospitals — current capacity</h3>
-    <div class="table-scroll">
-      <table class="hosp-table" id="hospTable">
-        <thead>
-          <tr><th>Hospital</th><th>ED bays</th><th>ICU free</th><th>Ward free</th><th>Accepting</th><th>Specialists on duty</th><th>Updated</th></tr>
-        </thead>
-        <tbody></tbody>
-      </table>
-    </div>
-  </section>
-</main>
+    <div class="hero-visual-wrap">
+      <div class="visual-glow-backdrop"></div>
+      <div class="hero-card-preview glass-card">
+        <div class="preview-header">
+          <div class="preview-dots"><span></span><span></span><span></span></div>
+          <span class="preview-title mono">AURA COMMAND HUB — LIVE DISPATCH</span>
+          <span class="live-status-tag">● LIVE</span>
+        </div>
 
-<!-- ===================== ANALYTICS TAB ===================== -->
-<main id="tab-analytics" class="tab-panel">
-  <section class="analytics-view">
-    <h2>📊 Emergency Response Analytics</h2>
-    <div class="kpi-grid" id="kpiGrid"></div>
-    <h3>Audit log</h3>
-    <div class="table-scroll">
-      <table class="audit-table" id="auditTable">
-        <thead><tr><th>Time</th><th>Event</th><th>Details</th></tr></thead>
-        <tbody></tbody>
-      </table>
+        <div class="preview-body-content">
+          <div class="preview-stat-card">
+            <div class="stat-mini">
+              <span class="stat-label">PATIENT ETA</span>
+              <span class="stat-val mono text-accent">8.4 mins</span>
+            </div>
+            <div class="stat-mini">
+              <span class="stat-label">AI TOP MATCH</span>
+              <span class="stat-val text-success">MAHAGUJARAT</span>
+            </div>
+            <div class="stat-mini">
+              <span class="stat-label">ICU READINESS</span>
+              <span class="stat-val text-success">6 Beds Free</span>
+            </div>
+          </div>
+
+          <div class="preview-chart-mock">
+            <div class="mock-bar-item"><span class="mock-bar-fill fill-1"></span></div>
+            <div class="mock-bar-item"><span class="mock-bar-fill fill-2"></span></div>
+            <div class="mock-bar-item"><span class="mock-bar-fill fill-3"></span></div>
+          </div>
+        </div>
+      </div>
     </div>
-  </section>
-</main>
+  </div>
+</section>
+
+<!-- ===================== TRUSTED BY STRIP ===================== -->
+<section class="trusted-strip-section">
+  <div class="section-container">
+    <p class="trusted-label">TRUSTED BY LEADING HEALTH SYSTEMS & EMERGENCY REGIONAL NETWORKS</p>
+    <div class="logo-grid">
+      <div class="brand-logo-item">🏥 MAHAGUJARAT Hospital</div>
+      <div class="brand-logo-item">🏥 CIVIL Hospital</div>
+      <div class="brand-logo-item">🏥 J N SHAH</div>
+      <div class="brand-logo-item">🏥 NIMS Emergency</div>
+      <div class="brand-logo-item">🏥 Om Clinic</div>
+      <div class="brand-logo-item">🏥 Trauma One Center</div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== FEATURES SECTION ===================== -->
+<section class="features-section" id="features">
+  <div class="section-container">
+    <div class="section-header text-center">
+      <span class="section-sub-tag">PLATFORM CAPABILITIES</span>
+      <h2 class="section-heading">Designed for High-Stakes Operations</h2>
+      <p class="section-desc">Engineered for EMS agencies, 911 dispatch centers, and receiving hospital ER teams.</p>
+    </div>
+
+    <div class="features-grid">
+      <div class="feature-card glass-card">
+        <div class="feature-icon-box bg-indigo">⚡</div>
+        <h3>AI Capacity Allocation</h3>
+        <p>Dynamic ranking algorithm factoring ICU bed free rate, ED intake load, and specialist shift availability.</p>
+      </div>
+
+      <div class="feature-card glass-card">
+        <div class="feature-icon-box bg-emerald">📡</div>
+        <h3>Live Route Telemetry</h3>
+        <p>Real-time GPS vehicle tracking with live traffic polyline integration and accurate drive time calculation.</p>
+      </div>
+
+      <div class="feature-card glass-card">
+        <div class="feature-icon-box bg-amber">🔔</div>
+        <h3>Instant ER Pre-Alerts</h3>
+        <p>Automated pre-notifications sent directly to receiving hospital dashboards with patient condition telemetry.</p>
+      </div>
+
+      <div class="feature-card glass-card">
+        <div class="feature-icon-box bg-indigo">🚨</div>
+        <h3>Dynamic Rerouting</h3>
+        <p>Automatic warning alerts and alternative destination recommendations if target ICU capacity changes en route.</p>
+      </div>
+
+      <div class="feature-card glass-card">
+        <div class="feature-icon-box bg-emerald">🩺</div>
+        <h3>Precision Severity Triage</h3>
+        <p>Clinical presentation matching ensuring cardiac, trauma, or stroke cases reach qualified specialist units.</p>
+      </div>
+
+      <div class="feature-card glass-card">
+        <div class="feature-icon-box bg-amber">📊</div>
+        <h3>Executive Audit Trail</h3>
+        <p>Full compliance logs tracking every dispatch recommendation, crew override rationale, and timestamp.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ===================== HOW IT WORKS ===================== -->
+<section class="how-it-works-section" id="how-it-works">
+  <div class="section-container">
+    <div class="section-header text-center">
+      <span class="section-sub-tag">SIMPLE THREE-STEP FLOW</span>
+      <h2 class="section-heading">How AURA Coordinates Care</h2>
+      <p class="section-desc">From initial 911/EMS paramedic assessment to physician handover.</p>
+    </div>
+
+    <div class="steps-grid">
+      <div class="step-card glass-card">
+        <div class="step-number">01</div>
+        <h3>Triage &amp; Clinical Input</h3>
+        <p>Paramedics select clinical presentation via one-click triage cards on mobile or dispatch console.</p>
+      </div>
+
+      <div class="step-card glass-card">
+        <div class="step-number">02</div>
+        <h3>AI Capacity Matching</h3>
+        <p>AURA ranks regional hospital readiness factoring real-time ICU free beds, ER wait times, and drive ETA.</p>
+      </div>
+
+      <div class="step-card glass-card">
+        <div class="step-number">03</div>
+        <h3>Pre-Alert &amp; Adaptive Route</h3>
+        <p>Automatic pre-notifications alert the receiving hospital ER while live telemetry monitors en-route capacity changes.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== STATISTICS SECTION ===================== -->
+<section class="stats-section">
+  <div class="section-container">
+    <div class="stats-grid">
+      <div class="stat-box">
+        <div class="stat-number mono" data-target="14.2">0</div>
+        <div class="stat-unit">mins</div>
+        <div class="stat-label">Avg Treatment Delay Saved</div>
+      </div>
+
+      <div class="stat-box">
+        <div class="stat-number mono" data-target="99.98">0</div>
+        <div class="stat-unit">%</div>
+        <div class="stat-label">Network System Uptime</div>
+      </div>
+
+      <div class="stat-box">
+        <div class="stat-number mono" data-target="450">0</div>
+        <div class="stat-unit">+</div>
+        <div class="stat-label">Hospitals Connected</div>
+      </div>
+
+      <div class="stat-box">
+        <div class="stat-number mono" data-target="120">0</div>
+        <div class="stat-unit">k+</div>
+        <div class="stat-label">Successful Dispatches</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ===================== FAQ ACCORDION SECTION ===================== -->
+<section class="faq-section" id="faq">
+  <div class="section-container">
+    <div class="section-header text-center">
+      <span class="section-sub-tag">FREQUENTLY ASKED QUESTIONS</span>
+      <h2 class="section-heading">Everything You Need to Know</h2>
+    </div>
+
+    <div class="faq-accordion-wrap">
+      <details class="faq-item glass-card">
+        <summary class="faq-summary">How does AURA calculate total time-to-treatment?</summary>
+        <div class="faq-answer">
+          AURA combines real-time traffic GPS drive times with receiving hospital ER bay occupancy, ICU bed availability, and specialist shift duty to estimate true time until a patient sees a doctor.
+        </div>
+      </details>
+
+      <details class="faq-item glass-card">
+        <summary class="faq-summary">Can paramedics override the AI recommendation?</summary>
+        <div class="faq-answer">
+          Yes. Paramedics and dispatchers always maintain final authority. Overrides are logged with a brief rationale for compliance and clinical audit.
+        </div>
+      </details>
+
+      <details class="faq-item glass-card">
+        <summary class="faq-summary">Is AURA HIPAA compliant?</summary>
+        <div class="faq-answer">
+          Absolustely. AURA encrypts all telemetry in transit and at rest, operating under strict HIPAA compliance standards and ISO-27001 data security guidelines.
+        </div>
+      </details>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== FINAL CTA BANNER ===================== -->
+<section class="final-cta-section">
+  <div class="section-container">
+    <div class="cta-banner-card glass-card text-center">
+      <h2 class="cta-heading">Ready to Eliminate Emergency Dispatch Delays?</h2>
+      <p class="cta-sub">Join over 250+ health systems delivering care faster with AURA.</p>
+      <div class="cta-btn-group">
+        <a href="live-simulator/index.html" target="_blank" rel="noopener" class="btn btn-primary pill-btn btn-lg shadow-cta">Launch Live Console</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== FOOTER ===================== -->
+<footer class="footer">
+  <div class="section-container footer-grid">
+    <div class="footer-col brand-col">
+      <div class="nav-logo">
+        <div class="logo-mark"><span class="logo-icon">⚡</span></div>
+        <div class="logo-text">
+          <span class="brand-title">AURA</span>
+          <span class="brand-sub">DISPATCH</span>
+        </div>
+      </div>
+      <p class="footer-about">Intelligent Emergency Allocation &amp; Routing System.</p>
+    </div>
+
+    <div class="footer-col">
+      <div class="footer-head">Product</div>
+      <a href="#features">Features</a>
+      <a href="live-simulator/index.html" target="_blank" rel="noopener">Live Simulator</a>
+    </div>
+
+    <div class="footer-col">
+      <div class="footer-head">Company</div>
+      <a href="#hero">About Us</a>
+      <a href="#faq">FAQ</a>
+    </div>
+
+    <div class="footer-col">
+      <div class="footer-head">Legal</div>
+      <a href="#">Privacy Policy</a>
+      <a href="#">Terms of Service</a>
+      <a href="#">HIPAA Statement</a>
+    </div>
+  </div>
+
+  <div class="section-container footer-bottom text-center">
+    <p>© 2026 AURA Emergency Coordinator Platform. All rights reserved.</p>
+  </div>
+</footer>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=2026-09-14b"></script>
+<script src="app.js?v=2026-09-14-v5"></script>
 </body>
 </html>

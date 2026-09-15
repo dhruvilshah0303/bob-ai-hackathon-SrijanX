@@ -6,7 +6,7 @@ run as a single process (see the README's "state in memory" note), so an
 in-memory limiter is consistent with that constraint, not a workaround for
 it. If this app is ever split across multiple instances, this needs to move
 to a shared store (Redis) at the same time as the rest of the state does -
-see PRODUCTION_READINESS_RECOMMENDATIONS.md, Tier 3.
+see the README's scalability notes.
 
 Algorithm: fixed-window counter per (client IP, current minute). Simple,
 cheap, and good enough to stop accidental hammering or a runaway frontend
