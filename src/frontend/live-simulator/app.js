@@ -986,33 +986,6 @@ async function loadAnalytics() {
   });
 }
 
-function setTriageProviderLine(triageProvider) {
-  const el = $("#triageProviderLine");
-  if (!el || !triageProvider) return;
-  el.textContent = triageProvider.active_mode === "watsonx"
-    ? `Powered by IBM watsonx.ai (${triageProvider.model_id}).`
-    : "Fallback mode: labeled keyword classifier (no watsonx.ai credentials configured).";
-}
-
-function renderTriageSuggestion(suggestion) {
-  const el = $("#triageResult");
-  if (!el) return;
-  const condition = (state.scenario?.conditions || []).find((c) => c.code === suggestion.condition_code);
-  const label = condition ? condition.label : suggestion.condition_code;
-  const isLive = suggestion.source === "watsonx";
-
-  el.className = isLive ? "triage-result" : "triage-result fallback";
-  el.hidden = false;
-  el.innerHTML = `
-    <div class="triage-result-head">
-      <span class="badge ${isLive ? "ok" : "warn"}">${isLive ? `IBM watsonx.ai · ${escapeHtml(suggestion.model_id || "Granite")}` : "Keyword fallback"}</span>
-      <span class="muted">confidence ${Math.round(suggestion.confidence * 100)}%</span>
-    </div>
-    <div class="triage-result-suggestion">Suggested: <b>${escapeHtml(label)}</b></div>
-    <div class="triage-result-reason">${escapeHtml(suggestion.reasoning)}</div>
-  `;
-}
-
 function populateSelects(conditions, hospitals) {
   const condSel = $("#conditionSelect");
   
@@ -1041,24 +1014,6 @@ function setupControls() {
     assessBtn.disabled = !e.target.value;
   });
 
-  const triageBtn = $("#triageSuggestBtn");
-  if (triageBtn) {
-    triageBtn.addEventListener("click", withBusyButton(triageBtn, async () => {
-      const noteInput = $("#triageNoteInput");
-      const note = (noteInput.value || "").trim();
-      if (!note) {
-        toast("Type a dispatcher note first, e.g. the symptoms the caller described.", "error");
-        return;
-      }
-      const suggestion = await postJSON(`/api/trips/${state.myTripId}/triage`, { note });
-      if (suggestion) {
-        renderTriageSuggestion(suggestion);
-        setTriageProviderLine({ active_mode: suggestion.source === "watsonx" ? "watsonx" : "keyword_fallback", model_id: suggestion.model_id });
-        $("#conditionSelect").value = suggestion.condition_code;
-        assessBtn.disabled = !suggestion.condition_code;
-      }
-    }));
-  }
   assessBtn.addEventListener("click", withBusyButton(assessBtn, async () => {
     const code = $("#conditionSelect").value;
     if (!code) return;
@@ -1142,8 +1097,6 @@ function setupControls() {
     state.simHospitalUserPicked = false;
     $("#conditionSelect").value = "";
     $("#assessBtn").disabled = true;
-    if ($("#triageNoteInput")) $("#triageNoteInput").value = "";
-    if ($("#triageResult")) $("#triageResult").hidden = true;
     state.capacityHistory = {};
     await postJSON("/api/reset");
     await startMyTrip();
@@ -1264,7 +1217,6 @@ async function init() {
   }
   state.scenario = scenario;
   $("#etaProviderBadge").textContent = `ETA source: ${scenario.eta_provider.active_mode === "live_api" ? "live traffic API" : "simulated (no API key configured)"}`;
-  setTriageProviderLine(scenario.triage_provider);
 
   const hospitalsList = await getJSON("/api/hospitals");
   state.hospitals = Object.fromEntries((hospitalsList || []).map((h) => [h.id, h]));

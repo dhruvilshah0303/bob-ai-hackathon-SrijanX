@@ -32,18 +32,22 @@ build order in TRD Section 14.
   the live call fails. The simulated traffic factor is now seeded per trip so
   rankings stay stable through a trip instead of flickering between
   recomputes.
-* **AI Triage Assist** (`backend/triage_service.py`): a dispatcher types a
-  free-text note (e.g. "55yo male, crushing chest pain radiating to left
-  arm") and it's classified into a suggested condition code by **IBM
-  watsonx.ai**, calling a Granite instruct model's text-generation API — the
-  suggestion just prefills the condition dropdown, it never sets the
-  condition itself, so the dispatcher still confirms it (same "decision
-  support, not authority" principle as the rest of the app). Same
-  real-provider-with-graceful-fallback shape as the ETA/routing services: no
-  `WATSONX_API_KEY`/`WATSONX_PROJECT_ID` configured, or a live call fails,
-  and it transparently falls back to a labeled keyword classifier instead of
-  breaking the demo or guessing silently — see `/api/health`'s
-  `triage_provider` for which one actually answered.
+* **AI Triage Assist** (`backend/triage_service.py`, `POST
+  /api/trips/{id}/triage`): given a dispatcher's free-text note (e.g.
+  "55yo male, crushing chest pain radiating to left arm"), classifies it
+  into a suggested condition code using **IBM watsonx.ai**, calling a
+  Granite instruct model's text-generation API — a suggestion only, it
+  would only ever prefill the condition dropdown, never set the condition
+  itself (same "decision support, not authority" principle as the rest of
+  the app). Same real-provider-with-graceful-fallback shape as the
+  ETA/routing services: no `WATSONX_API_KEY`/`WATSONX_PROJECT_ID`
+  configured, or a live call fails, and it transparently falls back to a
+  labeled keyword classifier instead of breaking the demo or guessing
+  silently — see `/api/health`'s `triage_provider` for which one actually
+  answered. Fully implemented and tested (`backend/tests/test_triage_service.py`,
+  plus the API-level tests in `test_api.py`) and reachable via the endpoint
+  above; the dispatcher-note input control is not currently wired up in the
+  console UI.
 * **AI hospital handover note** (`triage_service.generate_handover_note`):
   the same watsonx.ai Granite model drafts a short, natural-language
   clinical handover sentence (not just a bare condition code) that goes out
