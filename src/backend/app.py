@@ -52,6 +52,7 @@ logger = logging.getLogger("app")
 import auth
 import auth_routes
 import db
+import emergency_routes
 import eta_service
 import hospital_routes
 import ratelimit
@@ -201,6 +202,12 @@ manager = ConnectionManager()
 # import, since app.py already imports hospital_routes.
 hospital_routes.set_broadcaster(manager.broadcast)
 app.include_router(hospital_routes.router)
+
+# Real emergency intake + AI-assisted triage (see emergency_routes.py's
+# module docstring). Deliberately not yet wired to the recommendation
+# engine / trip dispatch below - that cutover lands with the ambulance
+# system phase.
+app.include_router(emergency_routes.router)
 
 
 def _public_trip_list():
