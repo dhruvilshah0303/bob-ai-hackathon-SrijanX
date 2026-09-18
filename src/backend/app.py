@@ -53,6 +53,7 @@ import auth
 import auth_routes
 import db
 import eta_service
+import hospital_routes
 import ratelimit
 import routing_service
 import triage_service
@@ -191,6 +192,15 @@ class ConnectionManager:
 
 
 manager = ConnectionManager()
+
+# Real, DB-backed hospital accounts (create/verify/resources/specialists) -
+# see hospital_routes.py's module docstring for why these coexist with the
+# GET /api/hospitals / POST .../capacity demo endpoints below instead of
+# replacing them yet. set_broadcaster() is called here (rather than
+# hospital_routes importing `manager` directly) purely to avoid a circular
+# import, since app.py already imports hospital_routes.
+hospital_routes.set_broadcaster(manager.broadcast)
+app.include_router(hospital_routes.router)
 
 
 def _public_trip_list():
