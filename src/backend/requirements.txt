@@ -14,6 +14,22 @@ pydantic==2.10.3
 # extra - sqlite3 ships with Python. Safe to always install.
 psycopg2-binary==2.9.10
 
+# Real user accounts: password hashing (bcrypt via passlib) and JWT
+# session tokens (see auth_service.py / auth_routes.py). Replaces the old
+# single shared APP_ACCESS_TOKEN gate.
+# bcrypt pinned to 4.0.1, not the latest 4.x: passlib 1.7.4 (unmaintained,
+# but still the standard choice for this) probes bcrypt.__about__.__version__
+# to pick its backend, which bcrypt >=4.1 removed - harmless in practice
+# (passlib falls back fine) but logs a scary-looking traceback on every
+# process start. 4.0.1 has the attribute passlib expects; no functional
+# difference for our usage.
+passlib[bcrypt]==1.7.4
+bcrypt==4.0.1
+pyjwt==2.10.1
+
+# Schema migrations for the new ORM models (models.py) - see alembic/.
+alembic==1.14.0
+
 # Optional - only used if SENTRY_DSN is set (see sentry_init.py). The app
 # runs fine without this installed; it's a no-op until you opt in.
 sentry-sdk==2.19.2

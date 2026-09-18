@@ -158,6 +158,7 @@ def test_no_warnings_in_development_with_defaults(monkeypatch):
 def test_production_with_open_cors_warns(monkeypatch):
     messages = _warnings_for(
         monkeypatch, IS_PRODUCTION=True, ALLOWED_ORIGINS=["*"], APP_ACCESS_TOKEN="secret", DATABASE_URL="postgresql://x",
+        JWT_SECRET_IS_GENERATED=False,
     )
     assert any("ALLOWED_ORIGINS" in m for m in messages)
 
@@ -165,7 +166,7 @@ def test_production_with_open_cors_warns(monkeypatch):
 def test_production_with_no_access_token_warns(monkeypatch):
     messages = _warnings_for(
         monkeypatch, IS_PRODUCTION=True, ALLOWED_ORIGINS=["https://real.example.com"],
-        APP_ACCESS_TOKEN=None, DATABASE_URL="postgresql://x",
+        APP_ACCESS_TOKEN=None, DATABASE_URL="postgresql://x", JWT_SECRET_IS_GENERATED=False,
     )
     assert any("APP_ACCESS_TOKEN" in m for m in messages)
 
@@ -173,14 +174,22 @@ def test_production_with_no_access_token_warns(monkeypatch):
 def test_production_with_sqlite_warns(monkeypatch):
     messages = _warnings_for(
         monkeypatch, IS_PRODUCTION=True, ALLOWED_ORIGINS=["https://real.example.com"],
-        APP_ACCESS_TOKEN="secret", DATABASE_URL=None,
+        APP_ACCESS_TOKEN="secret", DATABASE_URL=None, JWT_SECRET_IS_GENERATED=False,
     )
     assert any("DATABASE_URL" in m for m in messages)
+
+
+def test_production_with_generated_jwt_secret_warns(monkeypatch):
+    messages = _warnings_for(
+        monkeypatch, IS_PRODUCTION=True, ALLOWED_ORIGINS=["https://real.example.com"],
+        APP_ACCESS_TOKEN="secret", DATABASE_URL="postgresql://x", JWT_SECRET_IS_GENERATED=True,
+    )
+    assert any("JWT_SECRET" in m for m in messages)
 
 
 def test_production_fully_configured_warns_nothing(monkeypatch):
     messages = _warnings_for(
         monkeypatch, IS_PRODUCTION=True, ALLOWED_ORIGINS=["https://real.example.com"],
-        APP_ACCESS_TOKEN="secret", DATABASE_URL="postgresql://x",
+        APP_ACCESS_TOKEN="secret", DATABASE_URL="postgresql://x", JWT_SECRET_IS_GENERATED=False,
     )
     assert messages == []

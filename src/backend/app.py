@@ -50,6 +50,7 @@ config.configure_logging()
 logger = logging.getLogger("app")
 
 import auth
+import auth_routes
 import db
 import eta_service
 import ratelimit
@@ -92,6 +93,15 @@ app.add_middleware(
 )
 app.add_middleware(auth.AccessTokenMiddleware)
 app.add_middleware(ratelimit.RateLimitMiddleware)
+
+# Real user accounts (POST /api/auth/register|login|logout|refresh, GET
+# /api/auth/me) - see auth_routes.py/auth_service.py. These sit alongside
+# auth.AccessTokenMiddleware above rather than replacing it yet: the routes
+# below this point (hospitals/trips/etc) are still the in-memory demo
+# endpoints being migrated onto the real DB models phase by phase (see
+# models.py's module docstring), so they keep using the shared-token gate
+# until that migration lands - only /api/auth/* is real-JWT-protected so far.
+app.include_router(auth_routes.router)
 
 
 # ---------------------------------------------------------------------------

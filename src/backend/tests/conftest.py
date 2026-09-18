@@ -21,6 +21,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import pytest
 
+import models  # noqa: E402
 import ratelimit  # noqa: E402
 
 
@@ -29,3 +30,11 @@ def _reset_rate_limit_counters():
     ratelimit._counters.clear()
     yield
     ratelimit._counters.clear()
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _ensure_orm_tables():
+    """Test-only schema bootstrap for models.py's ORM tables (users,
+    hospitals, ...) - a real deployment always uses `alembic upgrade head`
+    instead (see models.init_models()'s docstring)."""
+    models.init_models()

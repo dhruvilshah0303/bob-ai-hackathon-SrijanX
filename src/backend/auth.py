@@ -29,6 +29,13 @@ from starlette.responses import JSONResponse
 import config
 
 UNAUTHENTICATED_PATHS = {"/api/health"}
+# /api/auth/* is the real login/register system (auth_routes.py) - it must
+# be reachable without already holding the legacy shared secret this
+# middleware guards, otherwise nobody could ever log in to get a real
+# token. Each /api/auth/* route enforces its own authorization (most are
+# public by design - register/login; /me and /logout require a valid JWT
+# via auth_service.get_current_user, checked independently of this gate).
+UNAUTHENTICATED_PREFIXES = ("/api/auth/",)
 
 
 def _valid(provided: str | None) -> bool:
@@ -46,7 +53,11 @@ class AccessTokenMiddleware(BaseHTTPMiddleware):
             return await call_next(request)  # auth disabled entirely
 
         path = request.url.path
-        needs_auth = path.startswith("/api/") and path not in UNAUTHENTICATED_PATHS
+        needs_auth = (
+            path.startswith("/api/")
+            and path not in UNAUTHENTICATED_PATHS
+            and not path.startswith(UNAUTHENTICATED_PREFIXES)
+        )
         if needs_auth:
             provided = request.headers.get("x-api-key")
             if not _valid(provided):

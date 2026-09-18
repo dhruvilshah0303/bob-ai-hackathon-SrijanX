@@ -61,6 +61,32 @@ TRUST_PROXY_HEADERS = os.environ.get("TRUST_PROXY_HEADERS", "false").strip().low
 # Optional error tracking - only initializes if a DSN is provided.
 SENTRY_DSN = os.environ.get("SENTRY_DSN", "").strip() or None
 
+# Real user accounts (see auth_service.py/auth_routes.py) - replaces the old
+# single shared APP_ACCESS_TOKEN gate above (still read by auth.py's legacy
+# middleware until the in-memory demo endpoints it guards are migrated onto
+# the new DB-backed models; see models.py's module docstring).
+#
+# No safe default for JWT_SECRET: unlike every other setting in this file,
+# a missing/guessable secret lets anyone forge a valid session token for any
+# user, including ADMIN - there's no "insecure but demo-able" middle ground
+# the way there is for e.g. open CORS. A random one is generated at process
+# startup if unset, so local dev still works with zero setup, but that means
+# every restart invalidates every existing session - startup_warnings()
+# below nags loudly if this happens with ENVIRONMENT=production, where it
+# would silently log everyone out on every deploy.
+_JWT_SECRET_ENV = os.environ.get("JWT_SECRET", "").strip()
+if _JWT_SECRET_ENV:
+    JWT_SECRET = _JWT_SECRET_ENV
+    JWT_SECRET_IS_GENERATED = False
+else:
+    import secrets as _secrets
+    JWT_SECRET = _secrets.token_urlsafe(48)
+    JWT_SECRET_IS_GENERATED = True
+
+JWT_ALGORITHM = "HS256"
+JWT_ACCESS_EXPIRE_MINUTES = int(os.environ.get("JWT_EXPIRE_MINUTES", "60"))
+JWT_REFRESH_EXPIRE_DAYS = int(os.environ.get("JWT_REFRESH_EXPIRE_DAYS", "7"))
+
 LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO").strip().upper()
 
 
@@ -90,4 +116,11 @@ def startup_warnings(logger: logging.Logger):
             "ENVIRONMENT=production but DATABASE_URL is not set - audit/trip history is a local SQLite "
             "file, which most hosting platforms erase on every redeploy. Set DATABASE_URL to a managed "
             "Postgres instance if that history should actually survive."
+        )
+    if IS_PRODUCTION and JWT_SECRET_IS_GENERATED:
+        logger.warning(
+            "ENVIRONMENT=production but JWT_SECRET is not set - a random secret was generated for this "
+            "process only, so every existing login session is invalidated on every restart/redeploy, and "
+            "horizontal scaling (multiple instances) would reject each other's tokens. Set JWT_SECRET to "
+            "a long random string that stays fixed across deploys."
         )
