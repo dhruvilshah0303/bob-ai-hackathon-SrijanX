@@ -49,6 +49,7 @@ import config
 config.configure_logging()
 logger = logging.getLogger("app")
 
+import ambulance_routes
 import auth
 import auth_routes
 import db
@@ -205,9 +206,14 @@ app.include_router(hospital_routes.router)
 
 # Real emergency intake + AI-assisted triage (see emergency_routes.py's
 # module docstring). Deliberately not yet wired to the recommendation
-# engine / trip dispatch below - that cutover lands with the ambulance
-# system phase.
+# engine / trip dispatch below - that cutover lands with the trip-lifecycle
+# phase, once ambulances (below) and emergencies can be linked by a trip.
 app.include_router(emergency_routes.router)
+
+# Real ambulance accounts + live GPS (see ambulance_routes.py's module
+# docstring) - not yet linked to a Trip (no trip_id on a location update
+# yet); that join lands with the trip-lifecycle phase.
+app.include_router(ambulance_routes.router)
 
 
 def _public_trip_list():
