@@ -33,17 +33,20 @@ def is_stale(ts: str, threshold_minutes: float) -> bool:
 
 def interpolate_along_path(points: list[dict], frac: float) -> dict:
     """Given a road-route polyline as a list of {"lat", "lng"} points (in
-    travel order) and a fraction 0..1 of the total leg, return the
-    lat/lng that many fractional distance-units along the path.
+    travel order) and a fraction 0..1 of the total leg, return the lat/lng
+    that many fractional distance-units along the path - walks the
+    cumulative distance along each segment rather than naive straight-line
+    interpolation between only the first/last point. With a 2-point path
+    (the graceful-degradation fallback when no live routing is available -
+    see routing_service.py) this collapses to a straight-line midpoint.
 
-    This replaces naive straight-line lat/lng interpolation (which cuts
-    diagonally across the map, ignoring roads entirely) with movement that
-    follows the actual route geometry: it walks the cumulative distance
-    along each segment of the path rather than treating origin/destination
-    as the only two points. With a 2-point path (the graceful-degradation
-    fallback when no live routing is available - see routing_service.py)
-    this collapses back to exactly the old straight-line behavior, so
-    nothing regresses when a route can't be fetched.
+    General-purpose polyline math, not simulation logic - no time or
+    randomness involved. Not currently called by any production code path
+    (the in-memory demo's fake ambulance-movement loop that used to call
+    this every tick was removed - see trip_routes.py for the real trip
+    lifecycle), kept because it's a real building block for estimating an
+    ambulance's progress along a route for real GPS-driven ETA/rerouting
+    display later.
     """
     if not points:
         return {"lat": 0.0, "lng": 0.0}

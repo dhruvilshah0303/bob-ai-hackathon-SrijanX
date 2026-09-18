@@ -129,12 +129,12 @@ def test_provider_status_distinguishes_unconfigured_from_configured_but_failing(
 
 def test_provider_status_never_leaks_the_api_key_in_a_failure_reason(monkeypatch):
     # SECURITY REGRESSION TEST: last_failure_reason is surfaced through the
-    # *public* /api/scenario and /api/health endpoints (no auth required
-    # unless APP_ACCESS_TOKEN is set) and rendered straight into the
-    # trip-status UI - `requests`' own exception text embeds the full
+    # public /api/health endpoint and meant for a dispatcher-facing routing-
+    # status display - `requests`' own exception text embeds the full
     # request URL, key=... included, so an unredacted failure reason would
-    # hand out a live Google/Mapbox API key to anyone with the page open the
-    # moment a live call raised an exception. This must never happen.
+    # hand out a live Google/Mapbox API key to anyone who can see that
+    # status the moment a live call raised an exception. This must never
+    # happen.
     monkeypatch.setenv("GOOGLE_MAPS_API_KEY", "SECRET-KEY-MUST-NOT-LEAK-12345")
     monkeypatch.delenv("MAPBOX_API_KEY", raising=False)
     routing_service._cache.clear()

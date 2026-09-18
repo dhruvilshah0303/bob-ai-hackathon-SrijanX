@@ -2,12 +2,11 @@
 Real user authentication: password hashing (bcrypt) + JWT session tokens +
 role-based authorization dependencies.
 
-Replaces the shared APP_ACCESS_TOKEN gate (auth.py) for every endpoint that
-has been migrated onto the real DB-backed models (see models.py's module
-docstring for which endpoints that is, as of this phase). auth.py's
-middleware stays in place, unchanged, for the endpoints that haven't moved
-yet - two auth mechanisms coexisting on different, non-overlapping route
-sets during the migration, not two mechanisms both guarding the same route.
+This is the only authentication mechanism in the app - every /api/* route
+requires a valid access token via get_current_user()/require_role() except
+POST /api/auth/register and POST /api/auth/login themselves (a client needs
+somewhere to get a token from) and GET /api/health (so platform health
+checks don't need credentials).
 
 Token shape: two JWTs per login, both HS256-signed with config.JWT_SECRET.
   - access token: short-lived (JWT_ACCESS_EXPIRE_MINUTES), sent as

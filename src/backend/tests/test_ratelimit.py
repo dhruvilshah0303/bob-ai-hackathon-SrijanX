@@ -8,6 +8,14 @@ safe because ratelimit.py reads config.* fresh on every request rather than
 caching it, and conftest.py's autouse fixture clears ratelimit._counters
 before and after every test so these don't interfere with each other or
 with any other test file sharing the same TestClient "client host".
+
+Hammers POST /api/auth/login with a deliberately wrong password rather than
+a GET, now that every real GET endpoint requires a valid JWT (there's no
+public, side-effect-free GET left except the deliberately rate-limit-exempt
+/api/health) - a bad-credentials login is cheap, has no side effects, and
+returns a deterministic 401 every time it's NOT rate limited, which is all
+these tests need: whether the request got through to the route at all
+(any non-429 status) versus was rejected by the limiter itself (429).
 """
 import sys
 from pathlib import Path
@@ -24,10 +32,11 @@ import ratelimit  # noqa: E402
 
 client = TestClient(app_module.app)
 
-# No autouse "/api/reset" fixture here (unlike the other test files) - these
-# tests never create trips, and a reset call would itself count against the
-# very rate-limit budget being tested, silently eating into the exact
-# request counts these tests assert on.
+_LOGIN_PAYLOAD = {"email": "ratelimit-probe@example-dev.test", "password": "definitely-wrong"}
+
+
+def _probe():
+    return client.post("/api/auth/login", json=_LOGIN_PAYLOAD)
 
 
 def _fake_request(client_host="1.2.3.4", forwarded_for=None):
@@ -74,21 +83,21 @@ def test_requests_within_limit_all_succeed(monkeypatch):
     monkeypatch.setattr(config, "RATE_LIMIT_ENABLED", True)
     monkeypatch.setattr(config, "RATE_LIMIT_PER_MINUTE", 5)
     for _ in range(5):
-        assert client.get("/api/hospitals").status_code == 200
+        assert _probe().status_code == 401  # reached the route (wrong password), not rate limited
 
 
 def test_requests_beyond_limit_get_429(monkeypatch):
     monkeypatch.setattr(config, "RATE_LIMIT_ENABLED", True)
     monkeypatch.setattr(config, "RATE_LIMIT_PER_MINUTE", 3)
-    codes = [client.get("/api/hospitals").status_code for _ in range(6)]
-    assert codes == [200, 200, 200, 429, 429, 429]
+    codes = [_probe().status_code for _ in range(6)]
+    assert codes == [401, 401, 401, 429, 429, 429]
 
 
 def test_disabling_rate_limit_allows_unlimited_requests(monkeypatch):
     monkeypatch.setattr(config, "RATE_LIMIT_ENABLED", False)
     monkeypatch.setattr(config, "RATE_LIMIT_PER_MINUTE", 1)
-    codes = [client.get("/api/hospitals").status_code for _ in range(5)]
-    assert codes == [200, 200, 200, 200, 200]
+    codes = [_probe().status_code for _ in range(5)]
+    assert codes == [401, 401, 401, 401, 401]
 
 
 def test_health_endpoint_is_exempt_from_rate_limit(monkeypatch):
@@ -103,10 +112,10 @@ def test_health_endpoint_is_exempt_from_rate_limit(monkeypatch):
 def test_health_exemption_does_not_exempt_other_routes(monkeypatch):
     monkeypatch.setattr(config, "RATE_LIMIT_ENABLED", True)
     monkeypatch.setattr(config, "RATE_LIMIT_PER_MINUTE", 2)
-    # Burn the budget on /api/health (exempt) - shouldn't help /api/hospitals.
+    # Burn the budget on /api/health (exempt) - shouldn't help the login route.
     for _ in range(10):
         client.get("/api/health")
-    codes = [client.get("/api/hospitals").status_code for _ in range(4)]
+    codes = [_probe().status_code for _ in range(4)]
     assert 429 in codes
 
 
@@ -118,7 +127,7 @@ def test_spoofed_forwarded_for_does_not_bypass_limit_by_default(monkeypatch):
     monkeypatch.setattr(config, "RATE_LIMIT_PER_MINUTE", 3)
     monkeypatch.setattr(config, "TRUST_PROXY_HEADERS", False)
     codes = [
-        client.get("/api/hospitals", headers={"X-Forwarded-For": f"9.9.9.{i}"}).status_code
+        client.post("/api/auth/login", json=_LOGIN_PAYLOAD, headers={"X-Forwarded-For": f"9.9.9.{i}"}).status_code
         for i in range(6)
     ]
     assert 429 in codes

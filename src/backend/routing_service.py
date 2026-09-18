@@ -10,10 +10,9 @@ That fallback is exactly the old behavior, so a missing/blocked API never
 breaks movement - it just silently loses the "follows real roads" polish,
 the same trade-off eta_service.py already makes for ETA accuracy.
 
-The result is a list of {"lat", "lng"} points in travel order - the
-frontend draws it as a polyline, and app.py's movement loop walks along it
-(see utils.interpolate_along_path) instead of lerping straight between two
-lat/lngs.
+The result is a list of {"lat", "lng"} points in travel order, meant for
+the frontend map to draw as a polyline showing the ambulance's actual route
+rather than a straight line to its destination.
 """
 import logging
 import os

@@ -4,32 +4,29 @@ AI-assisted triage runs synchronously against it, and the structured result
 (required resources/specializations/priority - never a diagnosis) is stored
 as an auditable AiDecision row.
 
-Mounted at /api/emergencies/* in app.py. Deliberately does NOT yet create a
-Trip or touch the hospital recommendation engine - matching a real
-emergency's actual lifecycle would need the ambulance/GPS system (next
-phase) to dispatch against, and recommendation_engine.py's cutover onto
-these DB-backed emergencies/hospitals happens together with that (see
-hospital_routes.py's module docstring on the same staged-migration
-approach). This phase's boundary: patient intake + real, grounded,
-structured triage - decision support, not a diagnosis, and not yet wired to
-"who gets dispatched".
+Mounted at /api/emergencies/* in app.py. Creating an emergency here does
+NOT itself create a Trip or request a hospital - GET .../recommendation,
+POST /api/hospital-requests, and POST /api/trips (all in trip_routes.py)
+are separate, dispatcher-initiated steps, matching the real workflow: triage
+is decision support offered immediately, but hospital selection and
+dispatch are still explicit human actions.
 
-Triage reuses triage_service.classify() (already real: IBM watsonx.ai with
-a labeled keyword-classifier fallback, see that module's docstring) against
-the same data/severity_rules.json condition list the existing recommendation
-engine already keys off of - condition_code is the join key between this
-phase's triage output and that engine's hard-constraint filtering, so a
-later phase can wire them together without changing either's data shape.
+Triage reuses triage_service.classify() (real: IBM watsonx.ai with a
+labeled keyword-classifier fallback, see that module's docstring) against
+data/severity_rules.json's condition list - condition_code is the join key
+between this triage output and the recommendation engine's hard-constraint
+filtering (trip_routes.py) and reservation logic (reservation_service.py),
+so all three agree on what a given condition requires without duplicating
+that table.
 """
 import json
-from functools import lru_cache
-from pathlib import Path
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session
 
+import severity_config
 import triage_service
 from auth_service import get_current_user, require_role
 from db_session import get_db
@@ -40,23 +37,12 @@ from models import (
 
 router = APIRouter(prefix="/api/emergencies", tags=["emergencies"])
 
-_DATA_DIR = Path(__file__).parent / "data"
-
-# Only NEW/ASSESSING/AWAITING_HOSPITAL can be cancelled through this
-# endpoint - once a hospital request/trip exists (later phases), cancelling
-# has to also release reservations/notify the ambulance, which belongs in
-# that phase's own cancel endpoint, not here.
+# Now a real trip/hospital-request workflow exists (trip_routes.py):
+# HOSPITAL_REQUESTED and later statuses have reservations/ambulances/hospital
+# notifications attached to them, so cancelling from that point on goes
+# through POST /api/trips/{id}/cancel (or hospital-request decline) instead
+# of this endpoint, which only ever touched the emergency row itself.
 _CANCELLABLE_FROM = {EmergencyStatus.NEW, EmergencyStatus.ASSESSING, EmergencyStatus.AWAITING_HOSPITAL}
-
-
-@lru_cache(maxsize=1)
-def _severity_rules() -> dict:
-    with open(_DATA_DIR / "severity_rules.json") as f:
-        return json.load(f)
-
-
-def _condition_by_code() -> dict:
-    return {c["code"]: c for c in _severity_rules()["conditions"]}
 
 
 class PatientInput(BaseModel):
@@ -153,9 +139,9 @@ def _run_triage(db: Session, emergency: Emergency, symptoms: str) -> TriageResul
     (deterministic, auditable), not from anything the model free-generates;
     the model only picks WHICH condition_code applies and explains why -
     see triage_service.classify()'s own docstring for its safety framing."""
-    conditions = _severity_rules()["conditions"]
+    conditions = severity_config.load()["conditions"]
     result = triage_service.classify(symptoms, conditions)
-    rule = _condition_by_code()[result["condition_code"]]
+    rule = severity_config.condition_by_code()[result["condition_code"]]
     required = rule.get("required", [])
     specialist = rule.get("preferred_specialist")
 
@@ -202,7 +188,7 @@ def _serialize(emergency: Emergency, db: Session) -> EmergencyPublic:
     )
     triage = None
     if latest_decision is not None and emergency.condition_code:
-        rule = _condition_by_code().get(emergency.condition_code, {})
+        rule = severity_config.condition_by_code().get(emergency.condition_code, {})
         constraints = json.loads(latest_decision.constraints or "{}")
         score = json.loads(latest_decision.score_breakdown or "{}")
         triage = TriageResultPublic(

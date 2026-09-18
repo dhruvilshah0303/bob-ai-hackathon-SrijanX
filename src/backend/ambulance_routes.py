@@ -3,13 +3,15 @@ Real ambulance accounts + live GPS. Mounted at /api/ambulances/* in app.py.
 
 An ambulance operator can only ever act on the one ambulance assigned to
 them (Ambulance.operator_id == the caller's user id) - checked server-side
-on every status/location write, never trusted from the request body. GPS
-writes update the ambulance's live position in place (a single-row UPDATE)
-rather than inserting a history row per tick - TripLocation (per-trip GPS
-history) only makes sense once a trip exists to attach it to, which lands
-with the trip-dispatch phase; see that phase's notes for the write-interval
-throttling this will need once history recording is added, so a real
-phone's watchPosition() stream doesn't flood the table.
+on every status/location write, never trusted from the request body.
+
+Every GPS update refreshes the ambulance's live position in place (a
+single-row UPDATE - always current, regardless of trip state). When the
+ambulance has an active EN_ROUTE/ARRIVING trip, it also appends a
+TripLocation history row - throttled to at most one every
+_TRIP_LOCATION_MIN_INTERVAL_SEC seconds, so a real phone's watchPosition()
+stream (which can fire faster than once a second) doesn't flood Postgres
+with a row per tick.
 
 Server timestamps every location update itself (datetime.now(UTC)) rather
 than trusting a client-supplied timestamp - a phone's clock isn't a
@@ -26,7 +28,29 @@ from sqlalchemy.orm import Session
 
 from auth_service import get_current_user, require_role
 from db_session import get_db
-from models import Ambulance, AmbulanceStatus, AuditEvent, Role, User
+from models import (
+    Ambulance, AmbulanceStatus, AuditEvent, Role, Trip, TripLocation,
+    TripStatus, User,
+)
+
+# Minimum gap between recorded TripLocation history rows for the same trip -
+# a phone's watchPosition() can fire every second or faster, and recording
+# every single tick would flood Postgres for no real benefit (Rule: don't
+# write excessively frequent GPS records). The ambulance's LIVE position
+# (Ambulance.lat/lng, above) still updates on every call regardless - only
+# the durable per-trip history is throttled.
+_TRIP_LOCATION_MIN_INTERVAL_SEC = 5
+
+
+def _as_aware_utc(dt: datetime) -> datetime:
+    """SQLite (unlike Postgres) doesn't actually preserve tzinfo through a
+    round trip - a DateTime(timezone=True) column comes back naive after a
+    fresh query, even though the same value was timezone-aware at the
+    moment it was created in this same process. Postgres (production)
+    round-trips it correctly, so this is a SQLite/local-dev-only quirk, but
+    comparing a naive value against datetime.now(timezone.utc) raises
+    TypeError either way if unnormalized - always assume naive means UTC."""
+    return dt if dt.tzinfo is not None else dt.replace(tzinfo=timezone.utc)
 
 router = APIRouter(prefix="/api/ambulances", tags=["ambulances"])
 
@@ -226,12 +250,31 @@ def update_location(
 
     _reject_if_null_island(req)
 
+    now = datetime.now(timezone.utc)
     ambulance.lat = req.lat
     ambulance.lng = req.lng
     ambulance.speed = req.speed
     ambulance.heading = req.heading
-    ambulance.last_location_update = datetime.now(timezone.utc)
+    ambulance.last_location_update = now
     ambulance.is_online = True
+
+    active_trip = (
+        db.query(Trip)
+        .filter(Trip.ambulance_id == ambulance.id, Trip.status.in_((TripStatus.EN_ROUTE, TripStatus.ARRIVING)))
+        .order_by(Trip.created_at.desc())
+        .first()
+    )
+    if active_trip is not None:
+        last_point = (
+            db.query(TripLocation)
+            .filter(TripLocation.trip_id == active_trip.id)
+            .order_by(TripLocation.recorded_at.desc())
+            .first()
+        )
+        stale_enough = last_point is None or (now - _as_aware_utc(last_point.recorded_at)).total_seconds() >= _TRIP_LOCATION_MIN_INTERVAL_SEC
+        if stale_enough:
+            db.add(TripLocation(trip_id=active_trip.id, lat=req.lat, lng=req.lng, speed=req.speed, heading=req.heading, recorded_at=now))
+
     db.commit()
     db.refresh(ambulance)
     return AmbulancePublic.model_validate(ambulance)

@@ -3,13 +3,9 @@ Real, DB-backed hospital accounts: create/verify (ADMIN), read, and
 resource/specialist updates scoped to the caller's own hospital
 (HOSPITAL_ADMIN) or any hospital (ADMIN).
 
-Mounted at /api/hospitals/* in app.py, alongside (not replacing) the
-existing in-memory GET /api/hospitals and POST /api/hospitals/{id}/capacity
-demo endpoints already in app.py - those still back the not-yet-migrated
-trip/recommendation engine (see models.py's module docstring); no path here
-collides with them (no existing GET /api/hospitals/{id}, PATCH .../resources,
-or .../specialists route). Cutting the trip engine itself over to read these
-real hospital records is a later phase - see app.py's include_router comment.
+Mounted at /api/hospitals/* in app.py. These hospitals are what
+hospital_service.py feeds the recommendation engine (trip_routes.py) -
+only VERIFIED, active ones are ever recommended to a dispatcher.
 
 Every write here: validates input for real (rejects an inconsistent
 free-vs-total count instead of silently clamping it - Rule: real production

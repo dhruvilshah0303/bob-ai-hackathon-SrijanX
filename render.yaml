@@ -1,10 +1,16 @@
+databases:
+  - name: srijanx-db
+    plan: free
+    databaseName: srijanx
+    user: srijanx
+
 services:
   - type: web
     name: ai-ambulance-coordinator-api
     runtime: python
     plan: free
     rootDir: .
-    buildCommand: pip install -r src/backend/requirements.txt
+    buildCommand: pip install -r src/backend/requirements.txt && cd src/backend && alembic upgrade head
     startCommand: cd src/backend && uvicorn app:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /api/health
     envVars:
@@ -18,11 +24,11 @@ services:
         value: "120"
       - key: TRUST_PROXY_HEADERS
         value: "true"
-      - key: DEMO_TIME_SCALE
-        value: "10"
       - key: PYTHON_VERSION
         value: "3.11.11"
-      - key: APP_ACCESS_TOKEN
-        value: ""
+      - key: JWT_SECRET
+        generateValue: true
       - key: DATABASE_URL
-        value: ""
+        fromDatabase:
+          name: srijanx-db
+          property: connectionString

@@ -26,12 +26,6 @@ IS_PRODUCTION = ENVIRONMENT == "production"
 _raw_origins = os.environ.get("ALLOWED_ORIGINS", "*").strip()
 ALLOWED_ORIGINS = ["*"] if _raw_origins == "*" else [o.strip() for o in _raw_origins.split(",") if o.strip()]
 
-# Shared-secret access gate for the API. Unset (the default) means auth is
-# OFF - fine for local dev, not fine for a public URL. Set this to a random
-# string before deploying anywhere reachable by strangers; the frontend will
-# then prompt for it once (see app.js) and remember it in localStorage.
-APP_ACCESS_TOKEN = os.environ.get("APP_ACCESS_TOKEN", "").strip() or None
-
 # Real persistence. Unset -> SQLite file next to the code (fine for local
 # dev; most hosting platforms wipe local disk on redeploy, so this matters
 # once you deploy - see db.py). Set to a Postgres URL
@@ -61,10 +55,9 @@ TRUST_PROXY_HEADERS = os.environ.get("TRUST_PROXY_HEADERS", "false").strip().low
 # Optional error tracking - only initializes if a DSN is provided.
 SENTRY_DSN = os.environ.get("SENTRY_DSN", "").strip() or None
 
-# Real user accounts (see auth_service.py/auth_routes.py) - replaces the old
-# single shared APP_ACCESS_TOKEN gate above (still read by auth.py's legacy
-# middleware until the in-memory demo endpoints it guards are migrated onto
-# the new DB-backed models; see models.py's module docstring).
+# Real user accounts (see auth_service.py/auth_routes.py) - every /api/*
+# endpoint except /api/auth/register and /api/auth/login requires a valid
+# JWT; there is no shared-secret fallback.
 #
 # No safe default for JWT_SECRET: unlike every other setting in this file,
 # a missing/guessable secret lets anyone forge a valid session token for any
@@ -105,11 +98,6 @@ def startup_warnings(logger: logging.Logger):
         logger.warning(
             "ENVIRONMENT=production but ALLOWED_ORIGINS is not set (defaulting to '*'). "
             "Any website can call this API from a browser. Set ALLOWED_ORIGINS to your real frontend origin."
-        )
-    if IS_PRODUCTION and APP_ACCESS_TOKEN is None:
-        logger.warning(
-            "ENVIRONMENT=production but APP_ACCESS_TOKEN is not set. The API has no access control - "
-            "anyone with the URL can create/cancel trips and change hospital capacity. Set APP_ACCESS_TOKEN."
         )
     if IS_PRODUCTION and DATABASE_URL is None:
         logger.warning(

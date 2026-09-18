@@ -47,7 +47,7 @@ def _read_config(env_overrides: dict) -> dict:
         "'TRUST_PROXY_HEADERS': config.TRUST_PROXY_HEADERS, "
         "'ALLOWED_ORIGINS': config.ALLOWED_ORIGINS, "
         "'IS_PRODUCTION': config.IS_PRODUCTION, "
-        "'APP_ACCESS_TOKEN': config.APP_ACCESS_TOKEN, "
+        "'JWT_SECRET_IS_GENERATED': config.JWT_SECRET_IS_GENERATED, "
         "}))"
     )
     result = subprocess.run(
@@ -64,7 +64,6 @@ def test_defaults_are_safe_for_local_dev():
     assert cfg["TRUST_PROXY_HEADERS"] is False  # SECURITY: must default closed
     assert cfg["ALLOWED_ORIGINS"] == ["*"]
     assert cfg["IS_PRODUCTION"] is False
-    assert cfg["APP_ACCESS_TOKEN"] is None
 
 
 @pytest.mark.parametrize("value", ["true", "TRUE", "1", "yes"])
@@ -102,16 +101,6 @@ def test_allowed_origins_wildcard_by_default():
     assert cfg["ALLOWED_ORIGINS"] == ["*"]
 
 
-def test_app_access_token_blank_means_disabled():
-    cfg = _read_config({"APP_ACCESS_TOKEN": "   "})
-    assert cfg["APP_ACCESS_TOKEN"] is None
-
-
-def test_app_access_token_set_is_preserved():
-    cfg = _read_config({"APP_ACCESS_TOKEN": "s3cret-value"})
-    assert cfg["APP_ACCESS_TOKEN"] == "s3cret-value"
-
-
 def test_environment_production_flag():
     cfg = _read_config({"ENVIRONMENT": "production"})
     assert cfg["IS_PRODUCTION"] is True
@@ -120,6 +109,16 @@ def test_environment_production_flag():
 def test_environment_defaults_to_development():
     cfg = _read_config({})
     assert cfg["IS_PRODUCTION"] is False
+
+
+def test_jwt_secret_unset_is_auto_generated():
+    cfg = _read_config({})
+    assert cfg["JWT_SECRET_IS_GENERATED"] is True
+
+
+def test_jwt_secret_set_is_not_flagged_as_generated():
+    cfg = _read_config({"JWT_SECRET": "a-real-fixed-secret"})
+    assert cfg["JWT_SECRET_IS_GENERATED"] is False
 
 
 # ------------------------------------------------------- startup_warnings -
@@ -150,31 +149,23 @@ def _warnings_for(monkeypatch, **overrides):
 
 def test_no_warnings_in_development_with_defaults(monkeypatch):
     messages = _warnings_for(
-        monkeypatch, IS_PRODUCTION=False, ALLOWED_ORIGINS=["*"], APP_ACCESS_TOKEN=None, DATABASE_URL=None,
+        monkeypatch, IS_PRODUCTION=False, ALLOWED_ORIGINS=["*"], DATABASE_URL=None, JWT_SECRET_IS_GENERATED=True,
     )
     assert messages == []
 
 
 def test_production_with_open_cors_warns(monkeypatch):
     messages = _warnings_for(
-        monkeypatch, IS_PRODUCTION=True, ALLOWED_ORIGINS=["*"], APP_ACCESS_TOKEN="secret", DATABASE_URL="postgresql://x",
+        monkeypatch, IS_PRODUCTION=True, ALLOWED_ORIGINS=["*"], DATABASE_URL="postgresql://x",
         JWT_SECRET_IS_GENERATED=False,
     )
     assert any("ALLOWED_ORIGINS" in m for m in messages)
 
 
-def test_production_with_no_access_token_warns(monkeypatch):
-    messages = _warnings_for(
-        monkeypatch, IS_PRODUCTION=True, ALLOWED_ORIGINS=["https://real.example.com"],
-        APP_ACCESS_TOKEN=None, DATABASE_URL="postgresql://x", JWT_SECRET_IS_GENERATED=False,
-    )
-    assert any("APP_ACCESS_TOKEN" in m for m in messages)
-
-
 def test_production_with_sqlite_warns(monkeypatch):
     messages = _warnings_for(
         monkeypatch, IS_PRODUCTION=True, ALLOWED_ORIGINS=["https://real.example.com"],
-        APP_ACCESS_TOKEN="secret", DATABASE_URL=None, JWT_SECRET_IS_GENERATED=False,
+        DATABASE_URL=None, JWT_SECRET_IS_GENERATED=False,
     )
     assert any("DATABASE_URL" in m for m in messages)
 
@@ -182,7 +173,7 @@ def test_production_with_sqlite_warns(monkeypatch):
 def test_production_with_generated_jwt_secret_warns(monkeypatch):
     messages = _warnings_for(
         monkeypatch, IS_PRODUCTION=True, ALLOWED_ORIGINS=["https://real.example.com"],
-        APP_ACCESS_TOKEN="secret", DATABASE_URL="postgresql://x", JWT_SECRET_IS_GENERATED=True,
+        DATABASE_URL="postgresql://x", JWT_SECRET_IS_GENERATED=True,
     )
     assert any("JWT_SECRET" in m for m in messages)
 
@@ -190,6 +181,6 @@ def test_production_with_generated_jwt_secret_warns(monkeypatch):
 def test_production_fully_configured_warns_nothing(monkeypatch):
     messages = _warnings_for(
         monkeypatch, IS_PRODUCTION=True, ALLOWED_ORIGINS=["https://real.example.com"],
-        APP_ACCESS_TOKEN="secret", DATABASE_URL="postgresql://x", JWT_SECRET_IS_GENERATED=False,
+        DATABASE_URL="postgresql://x", JWT_SECRET_IS_GENERATED=False,
     )
     assert messages == []

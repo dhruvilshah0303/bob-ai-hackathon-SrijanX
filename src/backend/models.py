@@ -1,16 +1,9 @@
 """
 SQLAlchemy ORM models for the real, persistent SrijanX schema (users,
 hospitals, ambulances, emergencies, trips, reservations, notifications,
-audit events, ...).
-
-This is deliberately a SEPARATE Base/metadata from db.py's existing
-SQLAlchemy Core tables (audit_log, trips) - those two Core tables back the
-current in-memory demo's persistence (state.log(), db.upsert_trip()) and
-stay untouched until app.py's business endpoints are migrated onto these
-ORM models phase by phase (hospitals/emergencies first, then trips). Both
-sets of tables live in the same physical database (same `engine`, imported
-from db.py) with no name collisions, so nothing here breaks the existing
-demo persistence while the migration is in progress.
+audit events, ...) - the single source of truth for all application state.
+Migrated with Alembic (see alembic/), using the engine db.py resolves from
+DATABASE_URL.
 
 Field names on Hospital/HospitalResources/HospitalSpecialist intentionally
 match what recommendation_engine.py already expects on a hospital dict
@@ -19,10 +12,9 @@ ward_beds_total/ward_beds_free, specialists[].type/on_duty) rather than the
 master-spec's icu_total/icu_available/ed_capacity/ed_occupied naming, so
 that engine's constraint-filtering/scoring logic (already correct, already
 tested) doesn't need to change - only its data source does. See
-db_serializers.py for the ORM -> plain-dict adapter recommend() consumes.
+hospital_service.py for the ORM -> plain-dict adapter recommend() consumes.
 
-Every primary key is a full UUID4 string (not the 8-char truncated ids the
-in-memory demo used for trip/audit ids) - collision-safe across restarts
+Every primary key is a full UUID4 string - collision-safe across restarts
 and real concurrent multi-user load, which the demo's short ids were never
 meant to survive.
 """
@@ -398,11 +390,8 @@ class Notification(Base):
 
 
 class AuditEvent(Base):
-    """New ORM audit trail for the real (DB-backed) business endpoints as
-    they land phase by phase - distinct from db.py's existing Core
-    audit_log table, which keeps recording the current in-memory demo
-    endpoints until they're migrated. Both are consolidated once that
-    migration is complete."""
+    """Append-only (from the application's perspective) audit trail for
+    every consequential state-changing action across the app."""
     __tablename__ = "audit_events"
 
     id = Column(String(36), primary_key=True, default=_uuid)
