@@ -191,6 +191,30 @@ class DeclineRequest(BaseModel):
     reason: Optional[str] = None
 
 
+def _require_own_hospital_or_privileged(user: User, hospital_id: str) -> None:
+    if user.role in (Role.ADMIN, Role.DISPATCHER):
+        return
+    if user.role == Role.HOSPITAL_ADMIN and user.hospital_id == hospital_id:
+        return
+    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="not authorized for this hospital")
+
+
+@router.get("/api/hospitals/{hospital_id}/hospital-requests", response_model=List[HospitalRequestPublic])
+def list_hospital_requests(
+    hospital_id: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    _require_own_hospital_or_privileged(user, hospital_id)
+    rows = (
+        db.query(HospitalRequest)
+        .filter(HospitalRequest.hospital_id == hospital_id)
+        .order_by(HospitalRequest.requested_at.desc())
+        .all()
+    )
+    return [HospitalRequestPublic.model_validate(r) for r in rows]
+
+
 @router.post("/api/hospital-requests", response_model=HospitalRequestPublic, status_code=status.HTTP_201_CREATED)
 async def create_hospital_request(
     req: HospitalRequestCreate,
@@ -318,6 +342,22 @@ def _log_event(db: Session, trip: Trip, event_type: str, user: User, details: Op
     db.add(TripEvent(trip_id=trip.id, event_type=event_type, actor_user_id=user.id, details=json.dumps(details) if details else None))
 
 
+@router.get("/api/hospitals/{hospital_id}/trips", response_model=List[TripPublic])
+def list_hospital_trips(
+    hospital_id: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    _require_own_hospital_or_privileged(user, hospital_id)
+    rows = (
+        db.query(Trip)
+        .filter(Trip.dest_hospital_id == hospital_id)
+        .order_by(Trip.created_at.desc())
+        .all()
+    )
+    return [TripPublic.model_validate(t) for t in rows]
+
+
 @router.post("/api/trips", response_model=TripPublic, status_code=status.HTTP_201_CREATED)
 async def create_trip(
     req: TripCreate,
@@ -366,6 +406,31 @@ def list_trips(
     db: Session = Depends(get_db),
 ):
     return [TripPublic.model_validate(t) for t in db.query(Trip).order_by(Trip.created_at.desc()).all()]
+
+
+_ACTIVE_TRIP_STATUSES = (TripStatus.DISPATCHED, TripStatus.EN_ROUTE, TripStatus.ARRIVING, TripStatus.ARRIVED)
+
+
+@router.get("/api/trips/mine", response_model=TripPublic)
+def get_my_trip(
+    user: User = Depends(require_role(Role.AMBULANCE_OPERATOR)),
+    db: Session = Depends(get_db),
+):
+    """So the ambulance portal can find its current trip without list-all
+    access (DISPATCHER/ADMIN only) - registered before the dynamic
+    /{trip_id} route below, same reasoning as ambulance_routes.py's /me."""
+    ambulance = db.query(Ambulance).filter(Ambulance.operator_id == user.id).first()
+    if ambulance is None:
+        raise HTTPException(status_code=404, detail="no ambulance is assigned to your account")
+    trip = (
+        db.query(Trip)
+        .filter(Trip.ambulance_id == ambulance.id, Trip.status.in_(_ACTIVE_TRIP_STATUSES))
+        .order_by(Trip.created_at.desc())
+        .first()
+    )
+    if trip is None:
+        raise HTTPException(status_code=404, detail="no active trip assigned")
+    return TripPublic.model_validate(trip)
 
 
 @router.get("/api/trips/{trip_id}", response_model=TripPublic)

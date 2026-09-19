@@ -165,6 +165,21 @@ def list_ambulances(
     return [AmbulancePublic.model_validate(a) for a in db.query(Ambulance).order_by(Ambulance.vehicle_number).all()]
 
 
+@router.get("/me", response_model=AmbulancePublic)
+def get_my_ambulance(
+    user: User = Depends(require_role(Role.AMBULANCE_OPERATOR)),
+    db: Session = Depends(get_db),
+):
+    """So the ambulance portal can find its own vehicle without needing
+    list-all access (which only ADMIN/DISPATCHER have) - registered before
+    the dynamic /{ambulance_id} route below, or "me" would be parsed as an
+    ambulance id and 404 there instead of ever reaching this handler."""
+    ambulance = db.query(Ambulance).filter(Ambulance.operator_id == user.id).first()
+    if ambulance is None:
+        raise HTTPException(status_code=404, detail="no ambulance is assigned to your account")
+    return AmbulancePublic.model_validate(ambulance)
+
+
 @router.get("/{ambulance_id}", response_model=AmbulancePublic)
 def get_ambulance(
     ambulance_id: str,

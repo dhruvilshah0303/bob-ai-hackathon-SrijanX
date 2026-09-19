@@ -284,3 +284,36 @@ def test_reassign_requires_admin(client):
         f"/api/ambulances/{ambulance['id']}", json={"vehicle_number": "Test AMB-999"}, headers=_auth(dispatcher_token),
     )
     assert resp.status_code == 403
+
+
+# ---------------------------------------------------------------------------
+# GET /api/ambulances/me - so the ambulance portal can find its own vehicle
+# ---------------------------------------------------------------------------
+def test_get_my_ambulance_returns_assigned_vehicle(client):
+    _admin, admin_token = _make_user(Role.ADMIN)
+    operator, operator_token = _make_user(Role.AMBULANCE_OPERATOR)
+    ambulance = _create_ambulance(client, admin_token, operator_id=operator.id)
+
+    resp = client.get("/api/ambulances/me", headers=_auth(operator_token))
+    assert resp.status_code == 200
+    assert resp.json()["id"] == ambulance["id"]
+
+
+def test_get_my_ambulance_404_when_unassigned(client):
+    _operator, operator_token = _make_user(Role.AMBULANCE_OPERATOR)
+    resp = client.get("/api/ambulances/me", headers=_auth(operator_token))
+    assert resp.status_code == 404
+
+
+def test_get_my_ambulance_requires_ambulance_operator_role(client):
+    _dispatcher, dispatcher_token = _make_user(Role.DISPATCHER)
+    resp = client.get("/api/ambulances/me", headers=_auth(dispatcher_token))
+    assert resp.status_code == 403
+
+
+def test_me_route_not_shadowed_by_dynamic_id_route(client):
+    # Regression: /me must resolve to get_my_ambulance, not be parsed as
+    # ambulance_id="me" and hit get_ambulance's 404 instead.
+    _operator, operator_token = _make_user(Role.AMBULANCE_OPERATOR)
+    resp = client.get("/api/ambulances/me", headers=_auth(operator_token))
+    assert resp.json().get("detail") != "ambulance not found"

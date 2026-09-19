@@ -18,12 +18,12 @@ def client():
     return TestClient(app)
 
 
-def _make_user(role: str) -> tuple[User, str]:
+def _make_user(role: str, hospital_id: str | None = None) -> tuple[User, str]:
     db = next(get_db())
     try:
         user = User(
             name=f"Test {role}", email=f"{role.lower()}-{uuid.uuid4().hex[:8]}@example-dev.test",
-            password_hash=hash_password("irrelevant-not-used"), role=role, is_active=True,
+            password_hash=hash_password("irrelevant-not-used"), role=role, hospital_id=hospital_id, is_active=True,
         )
         db.add(user)
         db.commit()
@@ -231,3 +231,48 @@ def test_cancel_requires_dispatcher_or_admin(client):
     _other_user, operator_token = _make_user(Role.AMBULANCE_OPERATOR)
     resp = client.post(f"/api/emergencies/{created['id']}/cancel", headers=_auth(operator_token))
     assert resp.status_code == 403
+
+
+# ---------------------------------------------------------------------------
+# get_emergency's scoped access for HOSPITAL_ADMIN/AMBULANCE_OPERATOR - only
+# once they have a real DB-recorded link to the emergency (a hospital
+# request/trip destined for their hospital, or a trip assigned to their
+# ambulance), never blanket access the way DISPATCHER/ADMIN have.
+# ---------------------------------------------------------------------------
+def test_unrelated_hospital_admin_cannot_view_emergency(client):
+    _user, dispatcher_token = _make_user(Role.DISPATCHER)
+    created = _create_emergency(client, dispatcher_token).json()
+    _hosp_admin, hosp_admin_token = _make_user(Role.HOSPITAL_ADMIN)
+    resp = client.get(f"/api/emergencies/{created['id']}", headers=_auth(hosp_admin_token))
+    assert resp.status_code == 403
+
+
+def test_unrelated_ambulance_operator_cannot_view_emergency(client):
+    _user, dispatcher_token = _make_user(Role.DISPATCHER)
+    created = _create_emergency(client, dispatcher_token).json()
+    _op, op_token = _make_user(Role.AMBULANCE_OPERATOR)
+    resp = client.get(f"/api/emergencies/{created['id']}", headers=_auth(op_token))
+    assert resp.status_code == 403
+
+
+def test_hospital_admin_can_view_emergency_once_requested(client):
+    from db_session import get_db
+    from models import Hospital, HospitalRequest, HospitalVerificationStatus
+
+    _user, dispatcher_token = _make_user(Role.DISPATCHER)
+    created = _create_emergency(client, dispatcher_token).json()
+
+    db = next(get_db())
+    try:
+        hospital = Hospital(name=f"Test Hospital {uuid.uuid4().hex[:8]}", lat=1, lng=1, verification_status=HospitalVerificationStatus.VERIFIED, is_active=True)
+        db.add(hospital)
+        db.flush()
+        db.add(HospitalRequest(emergency_id=created["id"], hospital_id=hospital.id))
+        db.commit()
+        hospital_id = hospital.id
+    finally:
+        db.close()
+
+    _hosp_admin, hosp_admin_token = _make_user(Role.HOSPITAL_ADMIN, hospital_id=hospital_id)
+    resp = client.get(f"/api/emergencies/{created['id']}", headers=_auth(hosp_admin_token))
+    assert resp.status_code == 200

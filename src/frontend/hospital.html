@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SrijanX - Hospital</title>
+<link rel="stylesheet" href="app.css?v=1" />
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">SrijanX <span class="tag">Hospital</span></div>
+  <div class="user-info"><span class="conn-dot" id="connDot"></span><span id="connLabel">connecting...</span> - <span id="userName"></span></div>
+  <button class="btn btn-ghost" id="logoutBtn">Log out</button>
+</header>
+
+<div id="toastStack" class="toast-stack" aria-live="polite"></div>
+
+<main class="main">
+
+  <section class="card">
+    <h2 id="hospitalName">Loading...</h2>
+    <div id="hospitalMeta" class="muted"></div>
+
+    <h3 style="margin-top:18px;">Resources</h3>
+    <form id="resourcesForm" class="grid grid-2"></form>
+    <button type="submit" form="resourcesForm" class="btn btn-primary" style="margin-top:10px;" id="saveResourcesBtn">Save resources</button>
+
+    <h3 style="margin-top:18px;">Specialists on duty</h3>
+    <div id="specialistList" class="list"></div>
+    <details style="margin-top:10px;">
+      <summary>Add specialist</summary>
+      <div class="grid grid-2" style="margin-top:8px;">
+        <input type="text" id="newSpecialistType" placeholder="e.g. cardiologist" />
+        <button type="button" class="btn btn-ghost" id="addSpecialistBtn">Add</button>
+      </div>
+    </details>
+  </section>
+
+  <section class="card">
+    <h2>Incoming requests</h2>
+    <div id="requestList" class="list"><p class="muted">Loading...</p></div>
+  </section>
+
+  <section class="card">
+    <h2>Trips to this hospital</h2>
+    <div id="tripList" class="list"><p class="muted">Loading...</p></div>
+  </section>
+
+  <section class="card">
+    <h2>Notifications</h2>
+    <div id="notificationList" class="list"><p class="muted">Loading...</p></div>
+  </section>
+
+</main>
+
+<script src="config.js"></script>
+<script src="js/api.js?v=1"></script>
+<script src="js/auth.js?v=1"></script>
+<script src="js/websocket.js?v=1"></script>
+<script src="js/hospital.js?v=1"></script>
+</body>
+</html>

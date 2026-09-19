@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SrijanX - Sign in</title>
+<link rel="stylesheet" href="app.css?v=1" />
+</head>
+<body>
+<div class="login-wrap">
+  <div class="card login-card">
+    <h2>SrijanX <span class="muted" style="font-size:0.8rem;">Emergency Coordination</span></h2>
+
+    <div id="toastStack" class="toast-stack" aria-live="polite"></div>
+
+    <form id="loginForm">
+      <label for="email">Email</label>
+      <input type="email" id="email" required autocomplete="username" />
+
+      <label for="password">Password</label>
+      <input type="password" id="password" required autocomplete="current-password" />
+
+      <button type="submit" class="btn btn-primary full" id="loginBtn" style="margin-top:18px;">Sign in</button>
+    </form>
+
+    <p class="hint" style="margin-top:18px;">
+      Dispatcher or ambulance crew without an account?
+      <a href="#" id="showRegister">Register</a>
+    </p>
+
+    <form id="registerForm" hidden>
+      <label for="regName">Full name</label>
+      <input type="text" id="regName" required />
+
+      <label for="regEmail">Email</label>
+      <input type="email" id="regEmail" required autocomplete="username" />
+
+      <label for="regPassword">Password (min 8 characters)</label>
+      <input type="password" id="regPassword" required minlength="8" autocomplete="new-password" />
+
+      <label for="regRole">Role</label>
+      <select id="regRole">
+        <option value="DISPATCHER">Dispatcher</option>
+        <option value="AMBULANCE_OPERATOR">Ambulance operator</option>
+      </select>
+      <p class="hint">Hospital staff and admin accounts are provisioned directly - contact your system administrator.</p>
+
+      <button type="submit" class="btn btn-primary full" id="registerBtn">Create account</button>
+      <button type="button" class="btn btn-ghost full" id="backToLogin" style="margin-top:8px;">Back to sign in</button>
+    </form>
+  </div>
+</div>
+
+<script src="config.js"></script>
+<script src="js/api.js?v=1"></script>
+<script>
+  const $ = (sel) => document.querySelector(sel);
+
+  function toast(message, kind = "info") {
+    const stack = $("#toastStack");
+    const el = document.createElement("div");
+    el.className = `toast ${kind}`;
+    el.textContent = message;
+    stack.appendChild(el);
+    setTimeout(() => el.remove(), 5000);
+  }
+
+  const ROLE_HOME = { ADMIN: "dispatcher.html", DISPATCHER: "dispatcher.html", HOSPITAL_ADMIN: "hospital.html", AMBULANCE_OPERATOR: "ambulance.html" };
+
+  // Already signed in? Skip straight to the right portal.
+  (function redirectIfAlreadySignedIn() {
+    const user = Api.getStoredUser();
+    if (user) window.location.href = ROLE_HOME[user.role] || "login.html";
+  })();
+
+  $("#showRegister").addEventListener("click", (e) => {
+    e.preventDefault();
+    $("#loginForm").hidden = true;
+    $("#registerForm").hidden = false;
+  });
+  $("#backToLogin").addEventListener("click", () => {
+    $("#registerForm").hidden = true;
+    $("#loginForm").hidden = false;
+  });
+
+  $("#loginForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const btn = $("#loginBtn");
+    btn.disabled = true;
+    try {
+      const user = await Api.login($("#email").value.trim(), $("#password").value);
+      window.location.href = ROLE_HOME[user.role] || "login.html";
+    } catch (err) {
+      toast(err.message || "Sign in failed", "error");
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  $("#registerForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const btn = $("#registerBtn");
+    btn.disabled = true;
+    try {
+      const user = await Api.register({
+        name: $("#regName").value.trim(),
+        email: $("#regEmail").value.trim(),
+        password: $("#regPassword").value,
+        role: $("#regRole").value,
+      });
+      window.location.href = ROLE_HOME[user.role] || "login.html";
+    } catch (err) {
+      toast(err.message || "Registration failed", "error");
+    } finally {
+      btn.disabled = false;
+    }
+  });
+</script>
+</body>
+</html>

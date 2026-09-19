@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SrijanX - Dispatcher</title>
+<link rel="stylesheet" href="app.css?v=1" />
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">SrijanX <span class="tag">Dispatcher</span></div>
+  <div class="user-info"><span class="conn-dot" id="connDot"></span><span id="connLabel">connecting...</span> - <span id="userName"></span></div>
+  <button class="btn btn-ghost" id="logoutBtn">Log out</button>
+</header>
+
+<div id="toastStack" class="toast-stack" aria-live="polite"></div>
+
+<main class="main">
+
+  <section class="card" id="newEmergencyCard">
+    <h2>New emergency</h2>
+    <p class="hint">AI-assisted triage - decision support only. Final destination and treatment decisions remain under authorized clinical/dispatch control.</p>
+    <form id="emergencyForm">
+      <div class="grid grid-2">
+        <div>
+          <label for="patientName">Patient name (optional)</label>
+          <input type="text" id="patientName" maxlength="200" />
+        </div>
+        <div>
+          <label for="patientAge">Age</label>
+          <input type="number" id="patientAge" min="0" max="130" />
+        </div>
+      </div>
+      <div class="grid grid-2">
+        <div>
+          <label for="patientGender">Gender</label>
+          <select id="patientGender">
+            <option value="">-</option>
+            <option value="male">Male</option>
+            <option value="female">Female</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div>
+          <label for="emergencyType">Emergency type</label>
+          <input type="text" id="emergencyType" maxlength="64" placeholder="e.g. medical, trauma" />
+        </div>
+      </div>
+
+      <label for="symptoms">Symptoms / dispatcher note</label>
+      <textarea id="symptoms" rows="3" required maxlength="1000" placeholder="e.g. 55yo male, crushing chest pain radiating to left arm, sweating"></textarea>
+
+      <div class="grid grid-2">
+        <div><label for="heartRate">Heart rate</label><input type="number" id="heartRate" min="0" max="350" /></div>
+        <div><label for="spo2">SpO2 (%)</label><input type="number" id="spo2" min="0" max="100" /></div>
+      </div>
+      <div class="grid grid-2">
+        <div><label for="systolicBp">Systolic BP</label><input type="number" id="systolicBp" min="0" max="350" /></div>
+        <div><label for="diastolicBp">Diastolic BP</label><input type="number" id="diastolicBp" min="0" max="250" /></div>
+      </div>
+      <div class="grid grid-2">
+        <div><label for="respRate">Respiratory rate</label><input type="number" id="respRate" min="0" max="100" /></div>
+        <div>
+          <label for="conscious">Conscious?</label>
+          <select id="conscious">
+            <option value="">Unknown</option>
+            <option value="true">Yes</option>
+            <option value="false">No</option>
+          </select>
+        </div>
+      </div>
+
+      <label>Location</label>
+      <div class="grid grid-2">
+        <input type="text" id="lat" placeholder="Latitude" required />
+        <input type="text" id="lng" placeholder="Longitude" required />
+      </div>
+      <button type="button" class="btn btn-ghost full" id="useLocationBtn" style="margin-top:8px;">Use current location</button>
+
+      <button type="submit" class="btn btn-primary full" id="createEmergencyBtn" style="margin-top:16px;">Create emergency &amp; run triage</button>
+    </form>
+  </section>
+
+  <section class="card" id="detailCard" hidden>
+    <h2>Emergency detail</h2>
+    <div id="detailBody"></div>
+  </section>
+
+  <section class="card">
+    <h2>Active emergencies</h2>
+    <div id="emergencyList" class="list"><p class="muted">Loading...</p></div>
+  </section>
+
+  <section class="card">
+    <h2>Notifications</h2>
+    <div id="notificationList" class="list"><p class="muted">Loading...</p></div>
+  </section>
+
+</main>
+
+<script src="config.js"></script>
+<script src="js/api.js?v=1"></script>
+<script src="js/auth.js?v=1"></script>
+<script src="js/websocket.js?v=1"></script>
+<script src="js/dispatcher.js?v=1"></script>
+</body>
+</html>

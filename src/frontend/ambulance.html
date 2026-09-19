@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SrijanX - Ambulance</title>
+<link rel="stylesheet" href="app.css?v=1" />
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">SrijanX <span class="tag">Ambulance</span></div>
+  <button class="btn btn-ghost" id="logoutBtn">Log out</button>
+</header>
+
+<div id="toastStack" class="toast-stack" aria-live="polite"></div>
+
+<main class="main" style="max-width:520px;">
+
+  <section class="card">
+    <h2 id="vehicleNumber">Loading...</h2>
+    <div id="statusBadge"></div>
+
+    <div class="grid grid-2" style="margin-top:14px;">
+      <div>
+        <div class="muted">GPS</div>
+        <div id="gpsStatus">Not started</div>
+      </div>
+      <div>
+        <div class="muted">Network</div>
+        <div><span class="conn-dot" id="connDot"></span><span id="connLabel">connecting...</span></div>
+      </div>
+    </div>
+    <div class="muted" id="lastUpdateLine" style="margin-top:8px;"></div>
+
+    <button class="btn btn-primary full" id="gpsToggleBtn" style="margin-top:14px;">Start GPS</button>
+  </section>
+
+  <section class="card" id="tripCard" hidden>
+    <h2>Current trip</h2>
+    <div id="tripBody"></div>
+  </section>
+
+  <section class="card" id="noTripCard">
+    <p class="muted">No active trip assigned right now.</p>
+  </section>
+
+</main>
+
+<script src="config.js"></script>
+<script src="js/api.js?v=1"></script>
+<script src="js/auth.js?v=1"></script>
+<script src="js/websocket.js?v=1"></script>
+<script src="js/ambulance.js?v=1"></script>
+</body>
+</html>

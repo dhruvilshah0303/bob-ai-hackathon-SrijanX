@@ -1,19 +1,11 @@
-// AURA Dispatch - marketing/landing page only.
+// SrijanX - marketing/landing page only.
 //
-// This file used to also drive the dispatcher console (map, live trips,
-// hospital tables, websocket) back when the landing page and the working
-// app were the same page. They are not anymore - the actual dispatcher
-// console lives at live-simulator/index.html with its own app.js - and this
-// page has no #map, #conditionSelect, #hospTable, or any other dispatcher
-// element for that code to attach to. Keeping that dead code around here
-// was actively harmful, not just unused: init() used to unconditionally
-// call startMyTrip() (POST /api/trips) and connectWs() (open a WebSocket)
-// on every single load of this page, silently creating a real phantom
-// ambulance trip - and its own "trip_created" audit log entry - every time
-// anyone visited or refreshed the marketing homepage, whether or not they
-// ever touched the actual dispatcher console. See README's "Fixed bugs"
-// notes for the full story. This file now contains only what the landing
-// page's own DOM (nav, animated stat counters, theme/sound toggles) needs.
+// The real portals (login.html, dispatcher.html, hospital.html,
+// ambulance.html) are separate pages with their own scripts (js/*.js) - this
+// page has no #map, #conditionSelect, #hospTable, or any other portal
+// element for that code to attach to. This file contains only what the
+// landing page's own DOM (nav, animated stat counters, theme/sound toggles)
+// needs.
 
 const state = {
   theme: localStorage.getItem("theme") || "light",

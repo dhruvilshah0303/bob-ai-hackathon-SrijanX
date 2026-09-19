@@ -518,3 +518,89 @@ def test_two_concurrent_reservations_for_the_last_icu_bed_only_one_succeeds(clie
 
     hosp = client.get(f"/api/hospitals/{hospital.id}").json()
     assert hosp["resources"]["icu_beds_free"] == 0  # never went negative, never double-booked
+
+
+# ---------------------------------------------------------------------------
+# Hospital-scoped listing endpoints (what the hospital portal calls)
+# ---------------------------------------------------------------------------
+def test_list_hospital_requests_scoped_to_own_hospital(client):
+    _dispatcher, dispatcher_token = _make_user(Role.DISPATCHER)
+    hospital = _make_hospital()
+    other_hospital = _make_hospital()
+    emergency = _create_emergency(client, dispatcher_token)
+    client.post(
+        "/api/hospital-requests", json={"emergency_id": emergency["id"], "hospital_id": hospital.id},
+        headers=_auth(dispatcher_token),
+    )
+
+    _own_admin, own_admin_token = _make_user(Role.HOSPITAL_ADMIN, hospital_id=hospital.id)
+    resp = client.get(f"/api/hospitals/{hospital.id}/hospital-requests", headers=_auth(own_admin_token))
+    assert resp.status_code == 200
+    assert any(r["emergency_id"] == emergency["id"] for r in resp.json())
+
+    _other_admin, other_admin_token = _make_user(Role.HOSPITAL_ADMIN, hospital_id=other_hospital.id)
+    resp = client.get(f"/api/hospitals/{hospital.id}/hospital-requests", headers=_auth(other_admin_token))
+    assert resp.status_code == 403
+
+
+def test_list_hospital_trips_scoped_to_own_hospital(client):
+    _dispatcher, dispatcher_token = _make_user(Role.DISPATCHER)
+    hospital = _make_hospital()
+    other_hospital = _make_hospital()
+    _emergency, trip, _operator_token, _ambulance = _dispatch_trip(client, dispatcher_token, hospital.id)
+
+    _own_admin, own_admin_token = _make_user(Role.HOSPITAL_ADMIN, hospital_id=hospital.id)
+    resp = client.get(f"/api/hospitals/{hospital.id}/trips", headers=_auth(own_admin_token))
+    assert resp.status_code == 200
+    assert any(t["id"] == trip["id"] for t in resp.json())
+
+    _other_admin, other_admin_token = _make_user(Role.HOSPITAL_ADMIN, hospital_id=other_hospital.id)
+    resp = client.get(f"/api/hospitals/{hospital.id}/trips", headers=_auth(other_admin_token))
+    assert resp.status_code == 403
+
+
+def test_dispatcher_can_list_any_hospitals_requests_and_trips(client):
+    _dispatcher, dispatcher_token = _make_user(Role.DISPATCHER)
+    hospital = _make_hospital()
+    resp = client.get(f"/api/hospitals/{hospital.id}/hospital-requests", headers=_auth(dispatcher_token))
+    assert resp.status_code == 200
+    resp = client.get(f"/api/hospitals/{hospital.id}/trips", headers=_auth(dispatcher_token))
+    assert resp.status_code == 200
+
+
+# ---------------------------------------------------------------------------
+# GET /api/trips/mine - so the ambulance portal can find its current trip
+# ---------------------------------------------------------------------------
+def test_get_my_trip_returns_active_trip(client):
+    _dispatcher, dispatcher_token = _make_user(Role.DISPATCHER)
+    hospital = _make_hospital()
+    _emergency, trip, operator_token, _ambulance = _dispatch_trip(client, dispatcher_token, hospital.id)
+
+    resp = client.get("/api/trips/mine", headers=_auth(operator_token))
+    assert resp.status_code == 200
+    assert resp.json()["id"] == trip["id"]
+
+
+def test_get_my_trip_404_when_no_active_trip(client):
+    _operator, operator_token = _make_user(Role.AMBULANCE_OPERATOR)
+    resp = client.get("/api/trips/mine", headers=_auth(operator_token))
+    assert resp.status_code == 404
+
+
+def test_get_my_trip_stops_returning_after_completion(client):
+    _dispatcher, dispatcher_token = _make_user(Role.DISPATCHER)
+    hospital = _make_hospital()
+    _emergency, trip, operator_token, _ambulance = _dispatch_trip(client, dispatcher_token, hospital.id)
+    client.post(f"/api/trips/{trip['id']}/start", headers=_auth(operator_token))
+    client.post(f"/api/trips/{trip['id']}/arrive", headers=_auth(operator_token))
+    _hosp_admin, hosp_admin_token = _make_user(Role.HOSPITAL_ADMIN, hospital_id=hospital.id)
+    client.post(f"/api/trips/{trip['id']}/complete", headers=_auth(hosp_admin_token))
+
+    resp = client.get("/api/trips/mine", headers=_auth(operator_token))
+    assert resp.status_code == 404
+
+
+def test_get_my_trip_requires_ambulance_operator_role(client):
+    _dispatcher, dispatcher_token = _make_user(Role.DISPATCHER)
+    resp = client.get("/api/trips/mine", headers=_auth(dispatcher_token))
+    assert resp.status_code == 403

@@ -31,8 +31,8 @@ import triage_service
 from auth_service import get_current_user, require_role
 from db_session import get_db
 from models import (
-    AiDecision, AuditEvent, Emergency, EmergencyStatus, EmergencyVitals,
-    Patient, Role, User,
+    AiDecision, Ambulance, AuditEvent, Emergency, EmergencyStatus,
+    EmergencyVitals, HospitalRequest, Patient, Role, Trip, User,
 )
 
 router = APIRouter(prefix="/api/emergencies", tags=["emergencies"])
@@ -286,13 +286,49 @@ def list_emergencies(
     return [_serialize(e, db) for e in emergencies]
 
 
+def _can_view_emergency(user: User, emergency_id: str, db: Session) -> bool:
+    """Dispatcher/admin see everything. A HOSPITAL_ADMIN or
+    AMBULANCE_OPERATOR only sees an emergency once they have a real,
+    DB-recorded link to it - a hospital request/trip destined for their own
+    hospital, or a trip assigned to their own ambulance (Rule: a hospital
+    only sees patient information necessary for an emergency routed to it;
+    an ambulance crew only sees the patient they're actually transporting).
+    Avoids importing trip_routes.py (which itself imports this module's
+    sibling severity_config, not this file) - queries the same tables
+    directly instead of introducing a cross-import."""
+    if user.role in (Role.DISPATCHER, Role.ADMIN):
+        return True
+    if user.role == Role.HOSPITAL_ADMIN and user.hospital_id:
+        linked = (
+            db.query(HospitalRequest)
+            .filter(HospitalRequest.emergency_id == emergency_id, HospitalRequest.hospital_id == user.hospital_id)
+            .first()
+            or db.query(Trip)
+            .filter(Trip.emergency_id == emergency_id, Trip.dest_hospital_id == user.hospital_id)
+            .first()
+        )
+        return linked is not None
+    if user.role == Role.AMBULANCE_OPERATOR:
+        linked = (
+            db.query(Trip)
+            .join(Ambulance, Trip.ambulance_id == Ambulance.id)
+            .filter(Trip.emergency_id == emergency_id, Ambulance.operator_id == user.id)
+            .first()
+        )
+        return linked is not None
+    return False
+
+
 @router.get("/{emergency_id}", response_model=EmergencyPublic)
 def get_emergency(
     emergency_id: str,
-    user: User = Depends(require_role(Role.DISPATCHER, Role.ADMIN)),
+    user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    return _serialize(_get_emergency_or_404(db, emergency_id), db)
+    emergency = _get_emergency_or_404(db, emergency_id)
+    if not _can_view_emergency(user, emergency_id, db):
+        raise HTTPException(status_code=403, detail="not authorized for this emergency")
+    return _serialize(emergency, db)
 
 
 @router.post("/{emergency_id}/vitals", response_model=EmergencyPublic)
