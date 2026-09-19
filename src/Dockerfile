@@ -53,4 +53,7 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD python3 -c "import urllib.request,os; urllib.request.urlopen(f'http://127.0.0.1:{os.environ.get(\"PORT\",\"8000\")}/api/health', timeout=3)" || exit 1
 
 # Shell form so $PORT is expanded at container start, not at build time.
-CMD uvicorn app:app --host 0.0.0.0 --port ${PORT}
+# Migrations run here (not just in render.yaml's buildCommand) so this
+# image is self-sufficient on any plain `docker run` deployment, not only
+# Render's - a fresh DATABASE_URL otherwise has no schema at all.
+CMD alembic upgrade head && uvicorn app:app --host 0.0.0.0 --port ${PORT}

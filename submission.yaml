@@ -13,37 +13,55 @@ team:
       email: "25dcs118@charusat.edu.in"
 
 submission:
-  title: "AI Ambulance-to-Hospital Coordinator"
+  title: "SrijanX - AI Emergency Coordination Platform"
   problem_statement: >
     Emergency dispatchers cannot choose the best destination from distance alone.
     They need a current view of hospital capacity, specialist availability, and
-    traffic so an ambulance reaches appropriate treatment as quickly as possible.
+    traffic so an ambulance reaches appropriate treatment as quickly as possible -
+    and that decision, and everything that happens after it, has to work for real,
+    concurrent, multi-role users, not just a single-operator demo.
   solution_summary: >
-    This project provides an explainable FastAPI coordinator that filters hospitals
-    by clinical constraints and ranks viable options by total time to treatment.
-    A browser dashboard shows live ambulance movement, reservations, rerouting,
-    hospital pre-alerts, and operational analytics.
+    A real, multi-user platform: JWT-authenticated accounts across four roles
+    (admin, dispatcher, hospital admin, ambulance operator), AI-assisted triage
+    (IBM watsonx.ai with a labeled fallback), an explainable recommendation engine
+    ranking hospitals by total time-to-treatment, a real hospital acceptance
+    workflow with transactional capacity reservation, real browser/phone GPS for
+    ambulances, and a full dispatch-to-completion trip lifecycle with
+    dispatcher-approved dynamic rerouting - all backed by PostgreSQL with
+    Alembic migrations, not in-memory demo state.
   key_features:
-    - "Explainable hospital recommendation using capacity, capability, and ETA"
-    - "Real-time Leaflet map with concurrent ambulance trips"
-    - "Capacity reservation, release, and dynamic rerouting"
-    - "Hospital pre-alerts and persistent audit analytics"
-    - "Traffic-aware ETA with a deterministic simulated fallback"
+    - "Real user accounts (bcrypt + JWT) and role-based access control - no shared tokens"
+    - "AI-assisted triage and hospital handover notes via IBM watsonx.ai, with a labeled fallback"
+    - "Explainable hospital recommendation using capacity, capability, specialist match, and real traffic-aware ETA"
+    - "Transactional capacity reservation - two emergencies can never both claim a hospital's last ICU bed"
+    - "Real ambulance GPS (navigator.geolocation), restricted to the assigned operator"
+    - "Full trip lifecycle: dispatch, start, arrive, complete, dispatcher-approved reroute, cancel"
+    - "Real-time websocket updates, per-user notifications, and a full audit trail"
+    - "Analytics computed live from the database - hospital acceptance rate, reroute count, dispatch-to-arrival time"
   tech_stack:
     languages: ["Python", "JavaScript", "HTML", "CSS"]
-    frameworks: ["FastAPI", "Uvicorn", "Leaflet"]
-    ibm_technologies: []
-    databases: ["SQLite", "PostgreSQL"]
-    other: ["Docker", "GitHub Actions", "WebSockets", "OpenStreetMap"]
+    frameworks: ["FastAPI", "Uvicorn", "SQLAlchemy", "Alembic"]
+    ibm_technologies: ["IBM watsonx.ai (Granite instruct model) - AI triage classification and hospital handover notes"]
+    databases: ["PostgreSQL", "SQLite (local dev)"]
+    other: ["Docker", "GitHub Actions", "WebSockets", "JWT"]
   what_we_are_most_proud_of: >
     The recommendation is a constrained, explainable decision rather than a
-    nearest-hospital lookup. The demo makes the tradeoff visible and models
-    multiple ambulances competing for shared hospital capacity.
+    nearest-hospital lookup, and every consequential step - hospital selection,
+    acceptance, dispatch, reroute - is a real, audited, role-enforced action
+    against a real database, not a scripted demo animation. The reservation
+    service makes the "two ambulances, one last bed" race genuinely impossible
+    (verified by a real concurrency test firing two threads at it), not just
+    unlikely in practice.
   known_limitations: >
-    Hospital data and ambulance movement are simulated for the prototype. The
-    system uses a shared access token instead of user roles, and production use
-    would require integrations with hospital information systems and a durable
-    shared state store for in-flight trips.
+    No dedicated live map or command-center dashboard UI yet - the three portals
+    (dispatcher/hospital/ambulance) are functional but plain. The websocket is one
+    shared broadcast channel rather than per-role channels. Manual browser
+    click-through of the rebuilt frontend was not performed in the development
+    environment (no browser-automation tooling available there); verified instead
+    via static analysis and that every API call matches an endpoint covered by
+    the passing backend test suite. Production use would still benefit from real
+    hospital information system integration for capacity data (today entered
+    directly by each hospital's own staff through the hospital portal).
 
 artifacts:
   source_code: "src/"
