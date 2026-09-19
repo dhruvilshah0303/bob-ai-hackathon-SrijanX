@@ -48,6 +48,7 @@ def _read_config(env_overrides: dict) -> dict:
         "'ALLOWED_ORIGINS': config.ALLOWED_ORIGINS, "
         "'IS_PRODUCTION': config.IS_PRODUCTION, "
         "'APP_ACCESS_TOKEN': config.APP_ACCESS_TOKEN, "
+        "'REQUIRE_LOGIN': config.REQUIRE_LOGIN, "
         "}))"
     )
     result = subprocess.run(
@@ -65,6 +66,19 @@ def test_defaults_are_safe_for_local_dev():
     assert cfg["ALLOWED_ORIGINS"] == ["*"]
     assert cfg["IS_PRODUCTION"] is False
     assert cfg["APP_ACCESS_TOKEN"] is None
+    assert cfg["REQUIRE_LOGIN"] is False  # open access by default, opt in to gate it
+
+
+@pytest.mark.parametrize("value", ["true", "TRUE", "1", "yes"])
+def test_require_login_truthy_values(value):
+    cfg = _read_config({"REQUIRE_LOGIN": value})
+    assert cfg["REQUIRE_LOGIN"] is True
+
+
+@pytest.mark.parametrize("value", ["false", "FALSE", "0", "no", "", "garbage"])
+def test_require_login_defaults_closed_for_anything_else(value):
+    cfg = _read_config({"REQUIRE_LOGIN": value})
+    assert cfg["REQUIRE_LOGIN"] is False
 
 
 @pytest.mark.parametrize("value", ["true", "TRUE", "1", "yes"])
@@ -150,37 +164,47 @@ def _warnings_for(monkeypatch, **overrides):
 
 def test_no_warnings_in_development_with_defaults(monkeypatch):
     messages = _warnings_for(
-        monkeypatch, IS_PRODUCTION=False, ALLOWED_ORIGINS=["*"], APP_ACCESS_TOKEN=None, DATABASE_URL=None,
+        monkeypatch, IS_PRODUCTION=False, ALLOWED_ORIGINS=["*"], DATABASE_URL=None,
+        ADMIN_PASSWORD="change-me-now", REQUIRE_LOGIN=False,
     )
     assert messages == []
 
 
 def test_production_with_open_cors_warns(monkeypatch):
     messages = _warnings_for(
-        monkeypatch, IS_PRODUCTION=True, ALLOWED_ORIGINS=["*"], APP_ACCESS_TOKEN="secret", DATABASE_URL="postgresql://x",
+        monkeypatch, IS_PRODUCTION=True, ALLOWED_ORIGINS=["*"], DATABASE_URL="postgresql://x",
+        ADMIN_PASSWORD="a-real-password", REQUIRE_LOGIN=True,
     )
     assert any("ALLOWED_ORIGINS" in m for m in messages)
 
 
-def test_production_with_no_access_token_warns(monkeypatch):
+def test_production_with_default_admin_password_warns(monkeypatch):
     messages = _warnings_for(
         monkeypatch, IS_PRODUCTION=True, ALLOWED_ORIGINS=["https://real.example.com"],
-        APP_ACCESS_TOKEN=None, DATABASE_URL="postgresql://x",
+        DATABASE_URL="postgresql://x", ADMIN_PASSWORD="change-me-now", REQUIRE_LOGIN=True,
     )
-    assert any("APP_ACCESS_TOKEN" in m for m in messages)
+    assert any("ADMIN_PASSWORD" in m for m in messages)
 
 
 def test_production_with_sqlite_warns(monkeypatch):
     messages = _warnings_for(
         monkeypatch, IS_PRODUCTION=True, ALLOWED_ORIGINS=["https://real.example.com"],
-        APP_ACCESS_TOKEN="secret", DATABASE_URL=None,
+        DATABASE_URL=None, ADMIN_PASSWORD="a-real-password", REQUIRE_LOGIN=True,
     )
     assert any("DATABASE_URL" in m for m in messages)
+
+
+def test_production_with_login_not_required_warns(monkeypatch):
+    messages = _warnings_for(
+        monkeypatch, IS_PRODUCTION=True, ALLOWED_ORIGINS=["https://real.example.com"],
+        DATABASE_URL="postgresql://x", ADMIN_PASSWORD="a-real-password", REQUIRE_LOGIN=False,
+    )
+    assert any("REQUIRE_LOGIN" in m for m in messages)
 
 
 def test_production_fully_configured_warns_nothing(monkeypatch):
     messages = _warnings_for(
         monkeypatch, IS_PRODUCTION=True, ALLOWED_ORIGINS=["https://real.example.com"],
-        APP_ACCESS_TOKEN="secret", DATABASE_URL="postgresql://x",
+        DATABASE_URL="postgresql://x", ADMIN_PASSWORD="a-real-password", REQUIRE_LOGIN=True,
     )
     assert messages == []

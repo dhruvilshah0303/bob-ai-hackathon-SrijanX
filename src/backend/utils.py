@@ -1,6 +1,17 @@
-"""Small shared helpers: distance math and freshness checks."""
+"""Small shared helpers: distance math, freshness checks, and JSON loading."""
+import json
 import math
 from datetime import datetime, timezone
+from pathlib import Path
+
+
+def load_json(path):
+    """Reads and parses a JSON file. Used to load the one-time seed data
+    (data/hospitals.json, data/severity_rules.json) - see app.py's State
+    class for how hospitals then hand off to the database as the real
+    source of truth after that first load."""
+    with open(Path(path)) as f:
+        return json.load(f)
 
 
 def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:

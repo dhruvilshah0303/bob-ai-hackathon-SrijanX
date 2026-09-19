@@ -21,6 +21,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import pytest
 
+import auth  # noqa: E402
 import ratelimit  # noqa: E402
 
 
@@ -29,3 +30,22 @@ def _reset_rate_limit_counters():
     ratelimit._counters.clear()
     yield
     ratelimit._counters.clear()
+
+
+@pytest.fixture
+def bypass_auth(monkeypatch):
+    """Real per-user login/RBAC (auth.py) has its own dedicated tests in
+    test_auth.py. Test files that are exercising unrelated business logic
+    (recommendation ranking, capacity reservation, XSS field handling, rate
+    limiting, ...) opt into this fixture instead of hand-carrying a session
+    token through every request - it makes every request resolve to a fixed
+    admin identity, the same way disabling auth entirely used to work in
+    local dev, without reintroducing a real "auth off" mode into the app
+    itself. auth.resolve_identity is looked up by name at call time from
+    both AccessTokenMiddleware.dispatch and check_ws_token (same module),
+    so patching it here is enough to cover both HTTP and WebSocket auth."""
+    monkeypatch.setattr(
+        auth, "resolve_identity",
+        lambda token: {"username": "test-user", "role": "admin", "hospital_id": None},
+    )
+    yield

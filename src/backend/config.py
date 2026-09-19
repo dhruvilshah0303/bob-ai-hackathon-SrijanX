@@ -63,6 +63,30 @@ SENTRY_DSN = os.environ.get("SENTRY_DSN", "").strip() or None
 
 LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO").strip().upper()
 
+# --- Real per-user login (auth.py/db.py) -----------------------------------
+# How long a login session stays valid before the user has to log in again.
+SESSION_TTL_HOURS = float(os.environ.get("SESSION_TTL_HOURS", "12"))
+
+# On first startup, if no user accounts exist yet at all, one admin account
+# is created automatically from these two values so there's always a way to
+# log in without touching the database by hand. Change ADMIN_PASSWORD before
+# deploying anywhere reachable by strangers - the startup warning below nags
+# you if you don't.
+ADMIN_USERNAME = os.environ.get("ADMIN_USERNAME", "admin").strip()
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "").strip() or "change-me-now"
+
+# Whether a request must present real credentials (a session token, or the
+# legacy APP_ACCESS_TOKEN) to use the API. Defaults to OFF: with no login
+# required, every request is treated as a full-access admin identity and the
+# frontend never shows the login gate - same "zero-friction local dev, opt
+# in for anything more" shape as the rest of this file. The real per-user
+# accounts/roles/sessions built by auth.py still work when this is on (or
+# when someone logs in anyway while it's off - see auth.py) - this flag only
+# controls whether logging in is REQUIRED. Set to "true" once you actually
+# want to gate access behind real accounts (e.g. a multi-hospital
+# deployment where different users should see different things).
+REQUIRE_LOGIN = os.environ.get("REQUIRE_LOGIN", "false").strip().lower() in ("1", "true", "yes")
+
 
 def configure_logging():
     logging.basicConfig(
@@ -80,14 +104,21 @@ def startup_warnings(logger: logging.Logger):
             "ENVIRONMENT=production but ALLOWED_ORIGINS is not set (defaulting to '*'). "
             "Any website can call this API from a browser. Set ALLOWED_ORIGINS to your real frontend origin."
         )
-    if IS_PRODUCTION and APP_ACCESS_TOKEN is None:
-        logger.warning(
-            "ENVIRONMENT=production but APP_ACCESS_TOKEN is not set. The API has no access control - "
-            "anyone with the URL can create/cancel trips and change hospital capacity. Set APP_ACCESS_TOKEN."
-        )
     if IS_PRODUCTION and DATABASE_URL is None:
         logger.warning(
-            "ENVIRONMENT=production but DATABASE_URL is not set - audit/trip history is a local SQLite "
-            "file, which most hosting platforms erase on every redeploy. Set DATABASE_URL to a managed "
-            "Postgres instance if that history should actually survive."
+            "ENVIRONMENT=production but DATABASE_URL is not set - trip/audit/hospital/user data lives in "
+            "a local SQLite file, which most hosting platforms erase on every redeploy. Set DATABASE_URL "
+            "to a managed Postgres instance if that data should actually survive."
+        )
+    if IS_PRODUCTION and ADMIN_PASSWORD == "change-me-now":
+        logger.warning(
+            "ENVIRONMENT=production but ADMIN_PASSWORD is unset - the auto-created admin account "
+            "(username '%s') has the default password 'change-me-now'. Set ADMIN_PASSWORD to something "
+            "real before anyone else can reach this URL.", ADMIN_USERNAME
+        )
+    if IS_PRODUCTION and not REQUIRE_LOGIN:
+        logger.warning(
+            "ENVIRONMENT=production but REQUIRE_LOGIN is not set - every request is treated as a "
+            "full-access admin identity with no login needed. Set REQUIRE_LOGIN=true if this deployment "
+            "should actually be gated behind real accounts."
         )

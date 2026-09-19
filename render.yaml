@@ -18,11 +18,17 @@ services:
         value: "120"
       - key: TRUST_PROXY_HEADERS
         value: "true"
-      - key: DEMO_TIME_SCALE
-        value: "10"
       - key: PYTHON_VERSION
         value: "3.11.11"
       - key: APP_ACCESS_TOKEN
         value: ""
+      - key: REQUIRE_LOGIN
+        value: "true"
+      - key: ADMIN_USERNAME
+        value: admin
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: SESSION_TTL_HOURS
+        value: "12"
       - key: DATABASE_URL
         value: ""

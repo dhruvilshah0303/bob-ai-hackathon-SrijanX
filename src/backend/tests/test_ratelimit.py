@@ -24,7 +24,9 @@ import ratelimit  # noqa: E402
 
 client = TestClient(app_module.app)
 
-# No autouse "/api/reset" fixture here (unlike the other test files) - these
+pytestmark = pytest.mark.usefixtures("bypass_auth")
+
+# No autouse reset fixture here (unlike the other test files) - these
 # tests never create trips, and a reset call would itself count against the
 # very rate-limit budget being tested, silently eating into the exact
 # request counts these tests assert on.

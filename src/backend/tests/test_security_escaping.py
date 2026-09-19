@@ -36,17 +36,21 @@ import app as app_module  # noqa: E402
 
 client = TestClient(app_module.app)
 
+pytestmark = pytest.mark.usefixtures("bypass_auth")
+
 SCRIPT_PAYLOAD = "<script>alert(1)</script>"
 IMG_PAYLOAD = "<img src=x onerror=alert(1)>"
+DEFAULT_INCIDENT = {"lat": 23.03, "lng": 72.56}
 
 
 @pytest.fixture(autouse=True)
 def reset_state():
-    client.post("/api/reset")
+    app_module.state.reset(wipe_history=True)
     yield
 
 
 def _create_trip(**kwargs):
+    kwargs.setdefault("incident_location", DEFAULT_INCIDENT)
     return client.post("/api/trips", json=kwargs)
 
 

@@ -243,16 +243,31 @@ def _watsonx_classify(note: str, conditions: list[dict]) -> dict | None:
         return None
 
 
-def _build_handover_prompt(note: str, condition: dict, eta_min: float, hospital_name: str) -> str:
+def _patient_line(patient_info: dict | None) -> str:
+    if not patient_info:
+        return ""
+    bits = []
+    if patient_info.get("age") is not None:
+        bits.append(f"{patient_info['age']}yo")
+    if patient_info.get("sex"):
+        bits.append(str(patient_info["sex"]))
+    prefix = f" Patient: {' '.join(bits)}." if bits else ""
+    notes = patient_info.get("notes")
+    notes_bit = f' Additional notes: "{_strip_for_prompt(notes)}"' if notes else ""
+    return prefix + notes_bit
+
+
+def _build_handover_prompt(note: str, condition: dict, eta_min: float, hospital_name: str, patient_info: dict | None = None) -> str:
     label = condition.get("label", "Unspecified condition")
     severity = condition.get("severity", "")
     specialist = condition.get("preferred_specialist")
     specialist_line = f" The condition typically requires a {specialist.replace(chr(95), chr(32))}." if specialist else ""
     note_line = f' Dispatcher note: "{_strip_for_prompt(note)}"' if note else " No additional dispatcher note was provided."
+    patient_line = _patient_line(patient_info)
     return (
         "You are drafting a one-sentence clinical handover for an emergency department "
         f"charge nurse at {hospital_name}, ahead of an ambulance's arrival. "
-        f"Assessed condition: {label} (severity {severity}).{specialist_line}{note_line} "
+        f"Assessed condition: {label} (severity {severity}).{specialist_line}{patient_line}{note_line} "
         f"Estimated time of arrival: {round(eta_min)} minutes.\n\n"
         "Write ONLY the handover sentence itself - no preamble, no JSON, no labels - as a single "
         "sentence a busy ED nurse could read in two seconds and immediately know what to prepare for. "
@@ -260,13 +275,13 @@ def _build_handover_prompt(note: str, condition: dict, eta_min: float, hospital_
     )
 
 
-def _watsonx_handover_note(note: str, condition: dict, eta_min: float, hospital_name: str) -> dict | None:
+def _watsonx_handover_note(note: str, condition: dict, eta_min: float, hospital_name: str, patient_info: dict | None = None) -> dict | None:
     global _last_failure_reason
     if not _api_key() or not _project_id():
         return None
     try:
         generated = _call_watsonx_generate(
-            _build_handover_prompt(note, condition, eta_min, hospital_name), max_new_tokens=90
+            _build_handover_prompt(note, condition, eta_min, hospital_name, patient_info), max_new_tokens=90
         )
         summary = " ".join(generated.split()).strip().strip('"')[:400]
         if not summary:
@@ -283,7 +298,7 @@ def _watsonx_handover_note(note: str, condition: dict, eta_min: float, hospital_
         return None
 
 
-def _template_handover_note(note: str, condition: dict, eta_min: float, hospital_name: str) -> dict:
+def _template_handover_note(note: str, condition: dict, eta_min: float, hospital_name: str, patient_info: dict | None = None) -> dict:
     """Deterministic fallback: same 'always usable, fully transparent'
     principle as _keyword_classify - a plain-language sentence built
     straight from structured fields, no model call involved."""
@@ -291,6 +306,14 @@ def _template_handover_note(note: str, condition: dict, eta_min: float, hospital
     severity = condition.get("severity")
     specialist = condition.get("preferred_specialist")
     parts = [f"{(severity + ' priority') if severity else 'Priority'} — {label}."]
+    if patient_info:
+        bits = []
+        if patient_info.get("age") is not None:
+            bits.append(f"{patient_info['age']}yo")
+        if patient_info.get("sex"):
+            bits.append(str(patient_info["sex"]))
+        if bits:
+            parts.append(f"Patient: {' '.join(bits)}.")
     if note:
         parts.append(f'Dispatcher note: "{" ".join(note.split())}".')
     if specialist:
@@ -299,16 +322,17 @@ def _template_handover_note(note: str, condition: dict, eta_min: float, hospital
     return {"summary": " ".join(parts)[:400], "source": "template_fallback", "model_id": None}
 
 
-def generate_handover_note(note: str, condition: dict, eta_min: float, hospital_name: str) -> dict:
+def generate_handover_note(note: str, condition: dict, eta_min: float, hospital_name: str, patient_info: dict | None = None) -> dict:
     """Returns {"summary", "source": "watsonx"|"template_fallback", "model_id"}
     - a short natural-language clinical handover sentence sent to the
     receiving hospital alongside the structured pre-alert fields (condition,
-    ETA). Tries watsonx.ai first, falls back to a deterministic template
-    built from the same structured data on missing credentials or any
-    live-call failure - the pre-alert always carries a usable summary."""
-    result = _watsonx_handover_note(note, condition, eta_min, hospital_name)
+    ETA, and - when provided - basic patient demographics). Tries
+    watsonx.ai first, falls back to a deterministic template built from the
+    same structured data on missing credentials or any live-call failure -
+    the pre-alert always carries a usable summary."""
+    result = _watsonx_handover_note(note, condition, eta_min, hospital_name, patient_info)
     if result is None:
-        result = _template_handover_note(note, condition, eta_min, hospital_name)
+        result = _template_handover_note(note, condition, eta_min, hospital_name, patient_info)
     return result
 
 
