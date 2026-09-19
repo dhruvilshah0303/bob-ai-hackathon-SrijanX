@@ -13,7 +13,7 @@ build order in TRD Section 14.
 
 * A working **AI Recommendation Engine** (`backend/recommendation_engine.py`)
   implementing the constraint-filter + weighted-scoring model from TRD
-  Section 5, with full explainability, and **120 passing pytest tests**
+  Section 5, with full explainability, and **121 passing pytest tests**
   covering its edge cases (no viable hospital, ties, stale data, disqualified-
   nearest-hospital), the API's error paths and reservation logic, road
   routing, AI Triage Assist's watsonx.ai/keyword-fallback classification, and

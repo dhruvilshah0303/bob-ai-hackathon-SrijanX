@@ -30,7 +30,7 @@ The coordinator filters hospitals against the incident severity and current capa
 
 ## Tech Stack
 
-Python, FastAPI, Uvicorn, SQLAlchemy, JavaScript, Leaflet, WebSockets, SQLite/PostgreSQL, Docker, GitHub Actions, and OpenStreetMap.
+Python, FastAPI, Uvicorn, SQLAlchemy, JavaScript, Leaflet, WebSockets, SQLite/PostgreSQL, Docker, GitHub Actions, OpenStreetMap, and optional IBM watsonx.ai Granite integration.
 
 The backend is configured for Render via `render.yaml`; the static frontend can be deployed to Vercel.
 

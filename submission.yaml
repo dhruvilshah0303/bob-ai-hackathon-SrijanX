@@ -32,7 +32,7 @@ submission:
   tech_stack:
     languages: ["Python", "JavaScript", "HTML", "CSS"]
     frameworks: ["FastAPI", "Uvicorn", "Leaflet"]
-    ibm_technologies: []
+    ibm_technologies: ["IBM watsonx.ai Granite"]
     databases: ["SQLite", "PostgreSQL"]
     other: ["Docker", "GitHub Actions", "WebSockets", "OpenStreetMap"]
   what_we_are_most_proud_of: >

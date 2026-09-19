@@ -1,15 +1,16 @@
 # Screenshots
 
-Place your application screenshots in this folder.
+These screenshots capture the hosted AI Ambulance-to-Hospital Coordinator using realistic demo data.
 
 ## Naming Convention
 
 Name your screenshots sequentially so they appear in logical order:
 
-  01-landing-page.png       ← First thing a user sees
-  02-main-feature.png       ← Your primary feature in action
-  03-output-or-results.png  ← The result / value delivered
-  04-additional-feature.png ← Any other notable screen
+  01-home-dashboard.png     ← Dispatcher dashboard
+  02-recommendation.png     ← Explainable hospital recommendation
+  03-hospital-view.png      ← Hospital pre-alert and capacity view
+  04-analytics.png          ← Operational analytics
+  05-live-simulator.png     ← Live ambulance simulator
 
 ## Requirements
 

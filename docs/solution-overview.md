@@ -21,4 +21,4 @@ The prototype optimizes time to treatment instead of distance and exposes the co
 
 ## IBM Technologies Used
 
-No IBM service is claimed in this prototype. The implementation is intentionally self-contained so judges can run it without external credentials. The architecture leaves clear integration points for hospital information systems and an enterprise AI service in a future production version.
+The optional AI Triage Assist and hospital handover-note flows integrate with IBM watsonx.ai using a Granite instruct model. The application remains runnable without IBM credentials: when the watsonx settings are absent or a live request fails, it labels and uses deterministic keyword/template fallbacks instead of silently presenting an AI-generated result.

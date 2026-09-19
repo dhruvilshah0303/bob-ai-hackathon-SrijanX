@@ -2,6 +2,9 @@
 
 Place your slide deck in this folder.
 
+The complete slide content is prepared in [slides.md](slides.md). Export it to
+`slides.pdf` or `slides.pptx` before final submission.
+
 ## Accepted Formats
 
   slides.pdf      ← Preferred (universally viewable)
