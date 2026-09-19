@@ -33,7 +33,9 @@ import config
 config.configure_logging()
 logger = logging.getLogger("app")
 
+import admin_routes
 import ambulance_routes
+import analytics_routes
 import auth_routes
 import auth_service
 import db
@@ -116,6 +118,8 @@ app.include_router(emergency_routes.router)
 app.include_router(ambulance_routes.router)
 app.include_router(trip_routes.router)
 app.include_router(notification_routes.router)
+app.include_router(admin_routes.router)
+app.include_router(analytics_routes.router)
 
 
 @app.get("/api/health")

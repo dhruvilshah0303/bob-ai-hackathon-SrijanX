@@ -243,6 +243,26 @@ const Api = {
   // Notifications
   getNotifications() { return request("/api/notifications"); },
   markNotificationRead(id) { return request(`/api/notifications/${id}/read`, { method: "POST" }); },
+
+  // Analytics
+  getAnalytics() { return request("/api/analytics"); },
+
+  // Admin
+  adminCreateUser(payload) {
+    return request("/api/admin/users", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+  },
+  adminListUsers() { return request("/api/admin/users"); },
+  adminUpdateUser(id, payload) {
+    return request(`/api/admin/users/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+  },
 };
 
 window.Api = Api;
